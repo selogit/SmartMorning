@@ -44,7 +44,9 @@
       ],
       "./plugins/withAlarmSound",
       "./plugins/withLocalSdk",
-      "./plugins/withNotifeeRepo"
+      "./plugins/withNotifeeRepo",
+      "./plugins/withReleaseNoMinify",
+      "./plugins/withLockScreenAlarm"
     ],
     "scheme": "modernbudzik"
   }
