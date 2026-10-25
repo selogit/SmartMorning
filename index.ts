@@ -1,8 +1,7 @@
-import { registerRootComponent } from 'expo';
+import notifee from '@notifee/react-native';
+import 'expo-router/entry';
 
-import App from './App';
-
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
-registerRootComponent(App);
+// Musi być zarejestrowane przy starcie aplikacji, poza drzewem Reacta.
+notifee.onBackgroundEvent(async ({ type }) => {
+  console.log('Background event:', type);
+});
