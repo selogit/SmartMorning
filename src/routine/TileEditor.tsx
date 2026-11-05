@@ -19,6 +19,10 @@ import { NoteMode, RoutineTile } from './types';
 import { CATEGORY_LABELS, isSoon, kindInfo } from './tileKinds';
 import { useNotes } from '../notes/NotesProvider';
 import { noteTitle } from '../notes/NotesListScreen';
+import AlarmTileEditor from './AlarmTileEditor';
+import { useMusic } from '../music/MusicProvider';
+import { serviceLabel } from '../music/services';
+import MusicSettings from '../music/MusicSettings';
 
 const NOTE_MODES: { mode: NoteMode; title: string; hint: string }[] = [
   { mode: 'today', title: 'Notatki na dziś', hint: 'Notatki ustawione na dziś i notatka dnia' },
@@ -35,6 +39,8 @@ interface Props {
 }
 
 export default function TileEditor({ tile, onSave, onClose }: Props) {
+  // Kafelek Budzik ma ten sam edytor co ekran Budzik.
+  if (tile?.kind === 'alarm') return <AlarmTileEditor tile={tile} onSave={onSave} onClose={onClose} />;
   return (
     <Modal visible={tile !== null} animationType="slide" onRequestClose={onClose}>
       {tile && <EditorBody key={tile.id} tile={tile} onSave={onSave} onClose={onClose} />}
@@ -55,6 +61,10 @@ function EditorBody({ tile, onSave, onClose }: { tile: RoutineTile } & Omit<Prop
   const { notes, createNote } = useNotes();
   const isNotes = tile.kind === 'notes';
   const sortedNotes = [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
+  const isMusic = tile.kind === 'music';
+  const music = useMusic();
+  const [musicId, setMusicId] = useState<string | undefined>(tile.musicId);
+  const [autoOpen, setAutoOpen] = useState(tile.autoOpen ?? false);
 
   const h = Number(hh);
   const m = Number(mm);
@@ -69,6 +79,8 @@ function EditorBody({ tile, onSave, onClose }: { tile: RoutineTile } & Omit<Prop
     url: info.customUrl ? url.trim() || undefined : tile.url,
     noteMode: isNotes ? noteMode : undefined,
     noteId: isNotes && noteMode === 'pick' ? noteId : undefined,
+    musicId: isMusic ? musicId : undefined,
+    autoOpen: isMusic ? autoOpen : undefined,
     ...overrides,
   });
 
@@ -197,6 +209,50 @@ function EditorBody({ tile, onSave, onClose }: { tile: RoutineTile } & Omit<Prop
           </>
         )}
         {!info.customUrl && info.url && <Text style={s.hint}>Otwiera: {info.url}</Text>}
+
+        {isMusic && (
+          <>
+            <Text style={s.label}>Serwis i playlisty</Text>
+            <MusicSettings />
+
+            <Text style={s.label}>Co odtworzyć w tym kroku</Text>
+            {[
+              {
+                id: undefined as string | undefined,
+                title: 'Domyślna playlista ★',
+                hint: music.items.find(i => i.id === music.defaultId)?.name ?? 'brak — dodaj ją w module Muzyka',
+              },
+              ...music.items.map(i => ({ id: i.id as string | undefined, title: i.name, hint: serviceLabel(i.service) })),
+            ].map(opt => {
+              const active = opt.id === musicId;
+              return (
+                <TouchableOpacity
+                  key={opt.id ?? 'default'}
+                  style={[s.modeRow, active && s.modeRowActive]}
+                  onPress={() => setMusicId(opt.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[s.radio, active && s.radioActive]}>{active && <View style={s.radioDot} />}</View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.modeTitle}>{opt.title}</Text>
+                    <Text style={s.modeHint}>{opt.hint}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={[s.modeRow, { marginTop: 12 }, autoOpen && s.modeRowActive]}
+              onPress={() => setAutoOpen(v => !v)}
+              activeOpacity={0.7}
+            >
+              <View style={[s.radio, autoOpen && s.radioActive]}>{autoOpen && <View style={s.radioDot} />}</View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.modeTitle}>Otwórz od razu</Text>
+                <Text style={s.modeHint}>Playlista otworzy się sama, gdy plan dojdzie do tego kroku</Text>
+              </View>
+            </TouchableOpacity>
+          </>
+        )}
 
         {isNotes && (
           <>

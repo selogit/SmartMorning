@@ -13,9 +13,11 @@ import {
   Platform,
   Alert,
   LayoutChangeEvent,
+  TextInput,
 } from 'react-native';
+import BackArrow from '../ui/BackArrow';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { INK, YELLOW, PAPER, WHITE, MUTED, DANGER, LINE } from '../theme';
 import { useRoutine } from './RoutineProvider';
 import { RoutineTile } from './types';
@@ -23,6 +25,9 @@ import { connectTiles, disconnectTile, orderedChain, removeTile, scheduleTimes }
 import { makeTile } from './storage';
 import { CATEGORY_LABELS, TILE_KINDS, TileCategory, TileKind, isSoon, kindInfo } from './tileKinds';
 import TileEditor from './TileEditor';
+import { useAlarms } from '../alarm/AlarmProvider';
+import { DAY_ORDER, DAY_SHORT, daysLabel } from '../alarm/time';
+import { Routine } from './types';
 
 const TILE_W = 128;
 const TILE_H = 74;
@@ -120,6 +125,8 @@ interface TileViewProps {
   onDrag: (id: string, x: number, y: number) => void;
   onDragEnd: () => void;
   onTap: (id: string) => void;
+  /** Tylko Budzik: on = alarm włączony, off = wyłączony, none = brak połączonego alarmu. */
+  alarmState?: 'on' | 'off' | 'none';
 }
 
 function TileView(props: TileViewProps) {
@@ -165,7 +172,19 @@ function TileView(props: TileViewProps) {
   const info = kindInfo(tile.kind);
   const soon = isSoon(info);
   const noteHint =
-    tile.kind === 'notes' ? (tile.noteMode === 'pick' ? 'wybrana' : tile.noteMode === 'new' ? 'nowa' : null) : null;
+    tile.kind === 'notes'
+      ? tile.noteMode === 'pick'
+        ? 'wybrana'
+        : tile.noteMode === 'new'
+          ? 'nowa'
+          : null
+      : tile.kind === 'alarm'
+        ? props.alarmState === 'off'
+          ? 'wyłączony'
+          : props.alarmState === 'none'
+            ? 'bez alarmu'
+            : null
+        : null;
   const meta = [time, tile.durationMin ? `${tile.durationMin} min` : null, noteHint].filter(Boolean).join(' · ');
 
   return (
@@ -205,7 +224,49 @@ function TileView(props: TileViewProps) {
 
 export default function PlanBoardScreen() {
   const bottomInset = useSafeAreaInsets().bottom;
-  const { routine, setRoutine } = useRoutine();
+  const { plans, todayPlan, updatePlan, addPlan, removePlan, setPlanDays } = useRoutine();
+  const params = useLocalSearchParams<{ plan?: string }>();
+  const [planId, setPlanId] = useState<string | undefined>(params.plan);
+  const routine = plans.find(p => p.id === planId) ?? todayPlan;
+  const setRoutine = (update: Routine | ((prev: Routine) => Routine)) => updatePlan(routine.id, update);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+
+  const switchPlan = (id: string) => {
+    setPlanId(id);
+    setSelectedId(null);
+    setConnectFrom(null);
+  };
+
+  const openSettings = () => {
+    setNameDraft(routine.name);
+    setSettingsOpen(true);
+  };
+
+  const createPlan = () => {
+    const plan = addPlan(`Plan ${plans.length + 1}`);
+    switchPlan(plan.id);
+    setNameDraft(plan.name);
+    setSettingsOpen(true);
+  };
+
+  const confirmRemovePlan = () => {
+    if (plans.length <= 1) return;
+    Alert.alert(`Usunąć plan „${routine.name}”?`, 'Kafelki tego planu zostaną usunięte. Alarmy zostają.', [
+      { text: 'Anuluj', style: 'cancel' },
+      {
+        text: 'Usuń',
+        style: 'destructive',
+        onPress: () => {
+          const other = plans.find(p => p.id !== routine.id);
+          removePlan(routine.id);
+          setSettingsOpen(false);
+          if (other) switchPlan(other.id);
+        },
+      },
+    ]);
+  };
+  const { alarms } = useAlarms();
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
@@ -316,7 +377,7 @@ export default function PlanBoardScreen() {
 
       <View style={s.header}>
         <TouchableOpacity style={s.backButton} onPress={goHome} activeOpacity={0.7}>
-          <Text style={s.backText}>←</Text>
+          <BackArrow />
         </TouchableOpacity>
         <Text style={s.title}>Plan dnia</Text>
         <View style={s.countBox}>
@@ -325,6 +386,38 @@ export default function PlanBoardScreen() {
           </Text>
         </View>
       </View>
+
+      <ScrollView
+        horizontal
+        style={s.tabs}
+        contentContainerStyle={s.tabsContent}
+        showsHorizontalScrollIndicator={false}
+      >
+        {plans.map(p => {
+          const active = p.id === routine.id;
+          return (
+            <TouchableOpacity
+              key={p.id}
+              style={[s.tab, active && s.tabActive]}
+              onPress={() => (active ? openSettings() : switchPlan(p.id))}
+              activeOpacity={0.7}
+            >
+              <Text style={[s.tabName, active && s.tabNameActive]} numberOfLines={1}>
+                {p.name}
+                {p.id === todayPlan.id ? ' · dziś' : ''}
+              </Text>
+              <Text style={[s.tabDays, active && s.tabDaysActive]} numberOfLines={1}>
+                {p.days.length === 0 ? 'bez dni' : daysLabel(p.days)}
+                {active ? '  ⚙' : ''}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+        <TouchableOpacity style={[s.tab, s.tabAdd]} onPress={createPlan} activeOpacity={0.7}>
+          <Text style={s.tabName}>+ Plan</Text>
+          <Text style={s.tabDays}>np. weekend</Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       <TouchableOpacity
         style={s.optionRow}
@@ -382,6 +475,15 @@ export default function PlanBoardScreen() {
                   onDrag={onDrag}
                   onDragEnd={() => {}}
                   onTap={onTap}
+                  alarmState={
+                    t.kind !== 'alarm'
+                      ? undefined
+                      : !t.alarmId
+                        ? 'none'
+                        : alarms.find(a => a.id === t.alarmId)?.enabled
+                          ? 'on'
+                          : 'off'
+                  }
                 />
               );
             })}
@@ -418,7 +520,7 @@ export default function PlanBoardScreen() {
           <TouchableOpacity
             style={[s.action, s.actionDivided, s.actionInk, chain.length === 0 && s.disabled]}
             disabled={chain.length === 0}
-            onPress={() => router.push('/plan-run')}
+            onPress={() => router.push(`/plan-run?plan=${routine.id}`)}
           >
             <Text style={[s.actionTextBig, s.onInkStrong]}>▶ Uruchom</Text>
           </TouchableOpacity>
@@ -450,6 +552,63 @@ export default function PlanBoardScreen() {
                 </View>
               ))}
             </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={settingsOpen} transparent animationType="fade" onRequestClose={() => setSettingsOpen(false)}>
+        <Pressable style={s.sheetBackdrop} onPress={() => setSettingsOpen(false)}>
+          <Pressable style={[s.sheet, s.settings]} onPress={() => {}}>
+            <View style={s.sheetHeader}>
+              <Text style={s.sheetTitle}>Ustawienia planu</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  updatePlan(routine.id, r => ({ ...r, name: nameDraft.trim() || r.name }));
+                  setSettingsOpen(false);
+                }}
+              >
+                <Text style={s.sheetClose}>Gotowe</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={s.sheetSection}>Nazwa</Text>
+            <TextInput
+              style={s.nameInput}
+              value={nameDraft}
+              onChangeText={setNameDraft}
+              placeholder="np. Dni robocze"
+              placeholderTextColor={MUTED}
+              maxLength={24}
+              selectionColor={INK}
+            />
+            <Text style={s.sheetSection}>Dni, w które obowiązuje</Text>
+            <View style={s.dayRow}>
+              {DAY_ORDER.map((d, i) => {
+                const on = routine.days.includes(d);
+                const owner = plans.find(p => p.id !== routine.id && p.days.includes(d));
+                return (
+                  <TouchableOpacity
+                    key={d}
+                    style={[s.day, i > 0 && s.dayDivided, on && s.dayOn]}
+                    onPress={() =>
+                      setPlanDays(routine.id, on ? routine.days.filter(x => x !== d) : [...routine.days, d])
+                    }
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[s.dayText, on && s.dayTextOn]}>{DAY_SHORT[d]}</Text>
+                    {!on && owner && <View style={s.dayTaken} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={s.settingsHint}>
+              Dzień może należeć tylko do jednego planu — zaznaczenie go tutaj zabierze go innemu planowi (kropka = dzień
+              innego planu). Dni bez planu używają planu „{plans[0]?.name}”.
+            </Text>
+            {plans.length > 1 && (
+              <TouchableOpacity style={s.removePlan} onPress={confirmRemovePlan}>
+                <Text style={s.removePlanText}>Usuń ten plan</Text>
+              </TouchableOpacity>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -494,6 +653,47 @@ const s = StyleSheet.create({
   title: { flex: 1, fontSize: 32, fontWeight: '900', color: INK, letterSpacing: -1 },
   countBox: { borderWidth: LINE, borderColor: INK, backgroundColor: YELLOW, paddingHorizontal: 10, paddingVertical: 6 },
   countText: { fontSize: 13, fontWeight: '700', color: INK },
+
+  tabs: { flexGrow: 0, borderBottomWidth: LINE, borderBottomColor: INK, backgroundColor: PAPER },
+  tabsContent: { paddingHorizontal: 12, paddingVertical: 10, gap: 8, alignItems: 'stretch' },
+  tab: {
+    minHeight: 48,
+    justifyContent: 'center',
+    borderWidth: LINE,
+    borderColor: INK,
+    backgroundColor: WHITE,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    maxWidth: 180,
+  },
+  tabActive: { backgroundColor: INK },
+  tabAdd: { borderStyle: 'dashed' },
+  tabName: { fontSize: 14, lineHeight: 19, fontWeight: '900', color: INK, includeFontPadding: false },
+  tabNameActive: { color: YELLOW },
+  tabDays: { fontSize: 11, lineHeight: 15, fontWeight: '700', color: MUTED, marginTop: 1, includeFontPadding: false },
+  tabDaysActive: { color: '#BDBDB6' },
+  settings: { maxHeight: undefined, paddingBottom: 16 },
+  nameInput: {
+    marginHorizontal: 16,
+    borderWidth: LINE,
+    borderColor: INK,
+    backgroundColor: WHITE,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 17,
+    fontWeight: '700',
+    color: INK,
+  },
+  dayRow: { flexDirection: 'row', marginHorizontal: 16, borderWidth: LINE, borderColor: INK, backgroundColor: WHITE },
+  day: { flex: 1, paddingVertical: 12, alignItems: 'center' },
+  dayDivided: { borderLeftWidth: LINE, borderLeftColor: INK },
+  dayOn: { backgroundColor: YELLOW },
+  dayText: { fontSize: 15, fontWeight: '800', color: MUTED },
+  dayTextOn: { color: INK, fontWeight: '900' },
+  dayTaken: { width: 6, height: 6, backgroundColor: MUTED, marginTop: 3 },
+  settingsHint: { fontSize: 12, color: MUTED, marginHorizontal: 16, marginTop: 8, lineHeight: 17 },
+  removePlan: { marginHorizontal: 16, marginTop: 14, borderWidth: LINE, borderColor: INK, paddingVertical: 12, alignItems: 'center' },
+  removePlanText: { fontSize: 15, fontWeight: '800', color: DANGER },
 
   optionRow: {
     flexDirection: 'row',

@@ -42,6 +42,13 @@
           "motionPermission": "Budzik liczy Twoje kroki, aby wyłączyć alarm po przejściu kilku kroków."
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Aparat służy do zeskanowania Twojego kodu, który wyłącza budzik.",
+          "recordAudioAndroid": false
+        }
+      ],
       "./plugins/withAlarmSound",
       "./plugins/withLocalSdk",
       "./plugins/withNotifeeRepo",

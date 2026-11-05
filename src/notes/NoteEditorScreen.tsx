@@ -15,6 +15,7 @@ import {
   TextStyle,
   TextInputSelectionChangeEvent,
 } from 'react-native';
+import BackArrow from '../ui/BackArrow';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { INK, YELLOW, PAPER, WHITE, MUTED, DANGER, LINE } from '../theme';
@@ -159,7 +160,7 @@ export default function NoteEditorScreen() {
 
       <View style={s.header}>
         <TouchableOpacity style={s.headerCell} onPress={goBack}>
-          <Text style={s.headerBack}>←</Text>
+          <BackArrow />
         </TouchableOpacity>
         <View style={s.headerTitleCell}>
           <Text style={s.headerTitle} numberOfLines={1}>
@@ -298,7 +299,7 @@ const s = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
   },
   header: { flexDirection: 'row', alignItems: 'stretch', borderBottomWidth: LINE, borderBottomColor: INK, backgroundColor: WHITE },
-  headerCell: { paddingHorizontal: 16, justifyContent: 'center', minHeight: 54 },
+  headerCell: { paddingHorizontal: 16, justifyContent: 'center', alignItems: 'center', minHeight: 54 },
   headerCellDivided: { borderLeftWidth: LINE, borderLeftColor: INK },
   headerBack: { fontSize: 22, fontWeight: '900', color: INK },
   headerTitleCell: { flex: 1, justifyContent: 'center', paddingHorizontal: 8, borderLeftWidth: LINE, borderLeftColor: INK },

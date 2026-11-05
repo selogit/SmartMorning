@@ -1,11 +1,29 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Keyboard } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Keyboard, Modal, SafeAreaView } from 'react-native';
+import QrScanner from './QrScanner';
 import { Pedometer } from 'expo-sensors';
 import { INK, YELLOW, WHITE, MUTED, LINE } from '../theme';
+import OptionWheel from '../ui/OptionWheel';
+
+const countOptions = (values: number[], unit: (n: number) => string) =>
+  values.map(v => ({ value: v, label: `${v} ${unit(v)}` }));
+
+/** Polska odmiana: 1 działanie, 2–4 działania, 5+ działań (z wyjątkiem 12–14). */
+const plural = (one: string, few: string, many: string) => (n: number) => {
+  if (n === 1) return one;
+  const d = n % 10;
+  const t = n % 100;
+  return d >= 2 && d <= 4 && (t < 12 || t > 14) ? few : many;
+};
+
+const MATH_OPTIONS = countOptions(MATH_COUNTS, plural('działanie', 'działania', 'działań'));
+const SHAKE_OPTIONS = countOptions(SHAKE_COUNTS, plural('potrząśnięcie', 'potrząśnięcia', 'potrząśnięć'));
+const STEP_OPTIONS = countOptions(STEP_COUNTS, plural('krok', 'kroki', 'kroków'));
+const DIFFICULTY_OPTIONS = DIFFICULTIES.map(d => ({ value: d, label: DIFFICULTY_LABELS[d] }));
 import {
   ChallengeConfig,
   ChallengeKind,
-  Difficulty,
+  DIFFICULTIES,
   CHALLENGE_OPTIONS,
   CHALLENGE_TITLES,
   DEFAULT_PHRASE,
@@ -54,7 +72,6 @@ interface Props {
   onChange: (c: ChallengeConfig) => void;
 }
 
-const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 
 async function ensureStepPermission() {
   // Zgodę na licznik kroków bierzemy od razu, a nie o 6:00 rano.
@@ -81,6 +98,7 @@ async function ensureStepPermission() {
 
 export default function ChallengePicker({ value, onChange }: Props) {
   const set = (patch: Partial<ChallengeConfig>) => onChange({ ...value, ...patch });
+  const [scanning, setScanning] = useState(false);
   const selected = value.types;
 
   const toggleKind = (kind: ChallengeKind) => {
@@ -103,16 +121,21 @@ export default function ChallengePicker({ value, onChange }: Props) {
       case 'math':
         return (
           <>
-            <OptionLabel>Poziom trudności</OptionLabel>
-            <Segmented
-              options={DIFFICULTIES}
-              value={value.mathDifficulty}
-              onChange={mathDifficulty => set({ mathDifficulty })}
-              format={d => DIFFICULTY_LABELS[d]}
-            />
+            <View style={s.wheelRow}>
+              <View style={s.wheelCol}>
+                <OptionLabel>Poziom trudności</OptionLabel>
+                <OptionWheel
+                  options={DIFFICULTY_OPTIONS}
+                  value={value.mathDifficulty}
+                  onChange={mathDifficulty => set({ mathDifficulty })}
+                />
+              </View>
+              <View style={s.wheelCol}>
+                <OptionLabel>Liczba działań</OptionLabel>
+                <OptionWheel options={MATH_OPTIONS} value={value.mathCount} onChange={mathCount => set({ mathCount })} />
+              </View>
+            </View>
             <Text style={s.example}>{DIFFICULTY_EXAMPLES[value.mathDifficulty]}</Text>
-            <OptionLabel>Liczba działań</OptionLabel>
-            <Segmented options={MATH_COUNTS} value={value.mathCount} onChange={mathCount => set({ mathCount })} />
           </>
         );
       case 'phrase':
@@ -137,14 +160,42 @@ export default function ChallengePicker({ value, onChange }: Props) {
         return (
           <>
             <OptionLabel>Liczba potrząśnięć</OptionLabel>
-            <Segmented options={SHAKE_COUNTS} value={value.shakeCount} onChange={shakeCount => set({ shakeCount })} />
+            <OptionWheel options={SHAKE_OPTIONS} value={value.shakeCount} onChange={shakeCount => set({ shakeCount })} />
           </>
         );
       case 'steps':
         return (
           <>
             <OptionLabel>Liczba kroków</OptionLabel>
-            <Segmented options={STEP_COUNTS} value={value.stepCount} onChange={stepCount => set({ stepCount })} />
+            <OptionWheel options={STEP_OPTIONS} value={value.stepCount} onChange={stepCount => set({ stepCount })} />
+          </>
+        );
+      case 'qr':
+        return (
+          <>
+            <OptionLabel>Twój kod</OptionLabel>
+            <View style={[s.qrBox, !value.qrValue && s.qrBoxMissing]}>
+              <Text style={s.qrStatus} numberOfLines={2}>
+                {value.qrValue ? `✓ Zapisany: ${value.qrValue.slice(0, 40)}${value.qrValue.length > 40 ? '…' : ''}` : 'Kod nie jest jeszcze zapisany'}
+              </Text>
+            </View>
+            <TouchableOpacity style={s.qrScan} onPress={() => setScanning(true)} activeOpacity={0.8}>
+              <Text style={s.qrScanText}>{value.qrValue ? 'Zeskanuj inny kod' : 'Zeskanuj swój kod'}</Text>
+            </TouchableOpacity>
+            <OptionLabel>Gdzie jest kod? (opcjonalnie)</OptionLabel>
+            <TextInput
+              style={s.input}
+              value={value.qrLabel ?? ''}
+              onChangeText={qrLabel => set({ qrLabel })}
+              placeholder="np. Łazienka, lustro"
+              placeholderTextColor={MUTED}
+              maxLength={30}
+              selectionColor={INK}
+            />
+            <Text style={s.example}>
+              Dowolny kod QR albo kreskowy — np. naklejka w łazience albo kod z pasty do zębów. Im dalej od łóżka, tym
+              lepiej.
+            </Text>
           </>
         );
     }
@@ -152,6 +203,29 @@ export default function ChallengePicker({ value, onChange }: Props) {
 
   return (
     <View style={s.root}>
+      <Modal visible={scanning} animationType="slide" onRequestClose={() => setScanning(false)}>
+        <SafeAreaView style={s.scanScreen}>
+          <View style={s.scanHeader}>
+            <Text style={s.scanTitle}>Zeskanuj kod, który wyłączy alarm</Text>
+            <TouchableOpacity onPress={() => setScanning(false)}>
+              <Text style={s.scanClose}>Anuluj</Text>
+            </TouchableOpacity>
+          </View>
+          {scanning && (
+            <QrScanner
+              hint="Skieruj aparat na kod"
+              onScanned={data => {
+                set({ qrValue: data });
+                setScanning(false);
+              }}
+              onPermissionDenied={() => {
+                setScanning(false);
+                Alert.alert('Brak dostępu do aparatu', 'Zezwól aplikacji na aparat w ustawieniach telefonu.');
+              }}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
       <View style={s.sectionBar}>
         <Text style={s.sectionTitle}>Zadania przed wyłączeniem</Text>
         <Text style={s.sectionHint}>Zaznacz jedno lub kilka — wykonasz je po kolei</Text>
@@ -266,6 +340,26 @@ const s = StyleSheet.create({
   },
   optionLabel: { fontSize: 13, fontWeight: '800', color: INK, marginTop: 12, marginBottom: 6 },
   example: { fontSize: 13, color: MUTED, marginTop: 6 },
+  qrBox: { borderWidth: LINE, borderColor: INK, backgroundColor: YELLOW, padding: 12 },
+  qrBoxMissing: { backgroundColor: WHITE, borderStyle: 'dashed' },
+  qrStatus: { fontSize: 14, fontWeight: '800', color: INK },
+  qrScan: { borderWidth: LINE, borderTopWidth: 0, borderColor: INK, backgroundColor: INK, paddingVertical: 12, alignItems: 'center' },
+  qrScanText: { color: YELLOW, fontSize: 15, fontWeight: '900' },
+  scanScreen: { flex: 1, backgroundColor: INK },
+  scanHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 44,
+    paddingBottom: 14,
+    borderBottomWidth: LINE,
+    borderBottomColor: YELLOW,
+  },
+  scanTitle: { color: YELLOW, fontSize: 16, fontWeight: '900', flex: 1, marginRight: 12 },
+  scanClose: { color: WHITE, fontSize: 15, fontWeight: '700' },
+  wheelRow: { flexDirection: 'row', gap: 10 },
+  wheelCol: { flex: 1 },
 
   segmented: { flexDirection: 'row', borderWidth: LINE, borderColor: INK },
   segment: { flex: 1, paddingVertical: 12, alignItems: 'center', backgroundColor: WHITE },
