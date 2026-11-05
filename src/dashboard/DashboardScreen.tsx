@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { INK, YELLOW, PAPER, WHITE, MUTED, LINE } from '../theme';
 import { useAlarms } from '../alarm/AlarmProvider';
-import { formatDuration, nextOccurrence, pad, parseTime } from '../alarm/time';
+import { daysLabel, formatDuration, nextAlarmDate, pad } from '../alarm/time';
 import { describeChallenge } from '../challenges/challenges';
 import { useRoutine } from '../routine/RoutineProvider';
 import { orderedChain, scheduleTimes } from '../routine/chain';
@@ -14,6 +14,9 @@ import { plainText } from '../notes/markdown';
 import { noteTitle } from '../notes/NotesListScreen';
 import { openTodayNote } from '../notes/today';
 import WeatherCard from '../weather/WeatherCard';
+import NewsCard from '../news/NewsCard';
+import { EveningCard } from '../sleep/BedtimeCard';
+import { addDaysKey } from '../notes/NotesProvider';
 
 const WEEKDAYS = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
 const MONTHS = [
@@ -38,15 +41,15 @@ export default function DashboardScreen() {
   const next = useMemo(() => {
     const upcoming = alarms
       .filter(a => a.enabled)
-      .map(alarm => ({ alarm, at: nextOccurrence(...parseTime(alarm.time), now) }))
+      .map(alarm => ({ alarm, at: nextAlarmDate(alarm.time, alarm.days, now) }))
       .sort((a, b) => a.at.getTime() - b.at.getTime());
     return upcoming[0] ?? null;
   }, [alarms, now]);
 
-  const { routine } = useRoutine();
+  const { todayPlan: routine } = useRoutine();
   const chain = useMemo(() => orderedChain(routine), [routine]);
   const times = useMemo(() => scheduleTimes(chain), [chain]);
-  const { notes, createNote } = useNotes();
+  const { notes, createNote, setShowOn } = useNotes();
   const todayNotes = useMemo(() => notesForDay(notes, todayKey(now)), [notes, now]);
 
   const newNote = () => {
@@ -75,9 +78,18 @@ export default function DashboardScreen() {
           </View>
         </View>
 
+        <EveningCard
+          onWriteNote={() => {
+            const note = createNote('# Na jutro\n\n- [ ] ');
+            setShowOn(note.id, addDaysKey(1));
+            router.push(`/notes/${note.id}?edit=1`);
+          }}
+        />
+
         <View style={styles.weatherBox}>
           <WeatherCard onPress={() => router.push('/weather')} />
         </View>
+
 
         <TouchableOpacity style={styles.nextCard} activeOpacity={0.8} onPress={() => router.push('/alarm')}>
           <View style={styles.nextHeader}>
@@ -90,7 +102,7 @@ export default function DashboardScreen() {
               <View style={styles.nextInfo}>
                 <Text style={styles.nextIn}>za {formatDuration(next.at.getTime() - now.getTime())}</Text>
                 <Text style={styles.nextLabel} numberOfLines={1}>
-                  {next.alarm.label}
+                  {next.alarm.label} · {daysLabel(next.alarm.days)}
                 </Text>
                 {challengeText && (
                   <Text style={styles.nextChallenge} numberOfLines={1}>
@@ -164,13 +176,26 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.sectionBar}>
-          <Text style={styles.sectionTitle}>Plan dnia</Text>
+          <Text style={styles.sectionTitle}>Wiadomości</Text>
+        </View>
+        <View style={styles.newsBox}>
+          <NewsCard count={3} onMore={() => router.push('/news')} />
+        </View>
+
+        <View style={styles.sectionBar}>
+          <Text style={styles.sectionTitle} numberOfLines={1}>
+            Plan dnia · {routine.name}
+          </Text>
           <Text style={styles.sectionCount}>
             {chain.length} {chain.length === 1 ? 'krok' : chain.length < 5 && chain.length > 1 ? 'kroki' : 'kroków'}
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.plan} activeOpacity={0.85} onPress={() => router.push('/plan')}>
+        <TouchableOpacity
+          style={styles.plan}
+          activeOpacity={0.85}
+          onPress={() => router.push(`/plan?plan=${routine.id}`)}
+        >
           {chain.length === 0 ? (
             <Text style={styles.planEmpty}>Plan jest pusty — ułóż kafelki na planszy.</Text>
           ) : (
@@ -196,14 +221,18 @@ export default function DashboardScreen() {
         </TouchableOpacity>
 
         <View style={styles.planActions}>
-          <TouchableOpacity style={styles.planEdit} activeOpacity={0.8} onPress={() => router.push('/plan')}>
+          <TouchableOpacity
+            style={styles.planEdit}
+            activeOpacity={0.8}
+            onPress={() => router.push(`/plan?plan=${routine.id}`)}
+          >
             <Text style={styles.planEditText}>Edytuj planszę</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.planRun, chain.length === 0 && styles.disabled]}
             activeOpacity={0.8}
             disabled={chain.length === 0}
-            onPress={() => router.push('/plan-run')}
+            onPress={() => router.push(`/plan-run?plan=${routine.id}`)}
           >
             <Text style={styles.planRunText}>▶ Uruchom</Text>
           </TouchableOpacity>
@@ -270,6 +299,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: YELLOW, fontSize: 15, fontWeight: '800' },
   sectionCount: { color: '#BDBDB6', fontSize: 13, fontWeight: '700' },
 
+  newsBox: { borderWidth: LINE, borderTopWidth: 0, borderColor: INK, backgroundColor: WHITE },
   notesBox: { borderWidth: LINE, borderTopWidth: 0, borderColor: INK, backgroundColor: WHITE },
   notesEmpty: { fontSize: 14, fontWeight: '600', color: MUTED, padding: 14, lineHeight: 20 },
   noteRow: { paddingHorizontal: 14, paddingVertical: 12 },

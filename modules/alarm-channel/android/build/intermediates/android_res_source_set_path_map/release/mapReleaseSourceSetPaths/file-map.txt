@@ -1,0 +1,9 @@
+expo.modules.alarmchannel.alarm-channel-pngs-0 C:\Dev\SM\modules\alarm-channel\android\build\generated\res\pngs\release
+expo.modules.alarmchannel.alarm-channel-updated_navigation_xml-1 C:\Dev\SM\modules\alarm-channel\android\build\generated\updated_navigation_xml\release
+expo.modules.alarmchannel.alarm-channel-mergeReleaseResources-2 C:\Dev\SM\modules\alarm-channel\android\build\intermediates\incremental\release\mergeReleaseResources\merged.dir
+expo.modules.alarmchannel.alarm-channel-mergeReleaseResources-3 C:\Dev\SM\modules\alarm-channel\android\build\intermediates\incremental\release\mergeReleaseResources\stripped.dir
+expo.modules.alarmchannel.alarm-channel-release-4 C:\Dev\SM\modules\alarm-channel\android\build\intermediates\merged_res\release\mergeReleaseResources
+expo.modules.alarmchannel.alarm-channel-release-5 C:\Dev\SM\modules\alarm-channel\android\build\intermediates\packaged_res\release\packageReleaseResources
+expo.modules.alarmchannel.alarm-channel-main-6 C:\Dev\SM\modules\alarm-channel\android\src\main\res
+expo.modules.alarmchannel.alarm-channel-release-7 C:\Dev\SM\modules\alarm-channel\android\src\release\res
+gradleHome-0 C:\Users\Mikol\.gradle

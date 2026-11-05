@@ -42,3 +42,8 @@ yarn-error.*
 
 # logi z telefonu
 crash*.txt
+
+# emulator Azure (VS Code)
+__azurite_db_*.json
+__blobstorage__/
+__queuestorage__/

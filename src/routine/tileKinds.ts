@@ -37,8 +37,8 @@ export const TILE_KINDS: TileKindInfo[] = [
     kind: 'news',
     label: 'Wiadomości',
     description: 'Najważniejsze wiadomości dnia',
-    category: 'app',
-    url: 'https://news.google.com/?hl=pl&gl=PL&ceid=PL:pl',
+    category: 'module',
+    route: '/news',
   },
   { kind: 'gmail', label: 'Gmail', description: 'Przejrzyj pocztę', category: 'app', url: 'https://mail.google.com/' },
   {
@@ -48,7 +48,7 @@ export const TILE_KINDS: TileKindInfo[] = [
     category: 'app',
     url: 'https://calendar.google.com/',
   },
-  { kind: 'music', label: 'Spotify', description: 'Muzyka na start', category: 'app', url: 'https://open.spotify.com/' },
+  { kind: 'music', label: 'Muzyka', description: 'Playlista na start dnia', category: 'module', route: '/music' },
   { kind: 'app', label: 'Własny link', description: 'Dowolna aplikacja lub strona', category: 'app', customUrl: true },
   { kind: 'task', label: 'Własne zadanie', description: 'Np. prysznic, kawa, ćwiczenia', category: 'task' },
 ];

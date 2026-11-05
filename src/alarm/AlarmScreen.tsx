@@ -1,108 +1,32 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   FlatList,
   StyleSheet,
   TouchableOpacity,
   Alert,
   Platform,
-  Modal,
-  Keyboard,
-  ScrollView,
   StatusBar,
   SafeAreaView,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
 } from 'react-native';
+import BackArrow from '../ui/BackArrow';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { INK, YELLOW, PAPER, WHITE, MUTED, DANGER, LINE } from '../theme';
-import {
-  ChallengeConfig,
-  DEFAULT_CHALLENGE,
-  DEFAULT_PHRASE,
-  describeChallenge,
-  normalizeChallenge,
-} from '../challenges/challenges';
-import ChallengePicker from '../challenges/ChallengePicker';
+import { DEFAULT_CHALLENGE, describeChallenge, normalizeChallenge } from '../challenges/challenges';
 import { useAlarms } from './AlarmProvider';
-import { Alarm } from './types';
-import { pad, parseTime, timeUntil } from './time';
+import AlarmEditor from './AlarmEditor';
+import { BedtimeRow } from '../sleep/BedtimeCard';
+import { Alarm, AlarmDraft } from './types';
+import { ALL_DAYS, daysLabel, pad } from './time';
 
 interface EditorState {
   editingId: string | null;
-  hours: number;
-  minutes: number;
-  label: string;
-  challenge: ChallengeConfig;
+  draft: AlarmDraft;
 }
 
-const ITEM_HEIGHT = 56;
-const VISIBLE_ITEMS = 5;
-const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
 const tabular = ['tabular-nums' as const];
-
-interface WheelProps {
-  count: number;
-  value: number;
-  onChange: (v: number) => void;
-  onTouchStart?: () => void;
-  divided?: boolean;
-}
-
-function Wheel({ count, value, onChange, onTouchStart, divided }: WheelProps) {
-  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
-  const lastIndex = useRef(value);
-  const didInitialScroll = useRef(false);
-
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const raw = Math.round(e.nativeEvent.contentOffset.y / ITEM_HEIGHT);
-    const index = Math.min(count - 1, Math.max(0, raw));
-    if (index !== lastIndex.current) {
-      lastIndex.current = index;
-      onChange(index);
-    }
-  };
-
-  return (
-    <View style={[styles.wheel, divided && styles.wheelDivided]}>
-      <View pointerEvents="none" style={styles.wheelHighlight} />
-      <ScrollView
-        ref={scrollRef}
-        nestedScrollEnabled
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_HEIGHT}
-        decelerationRate="fast"
-        scrollEventThrottle={16}
-        onScroll={handleScroll}
-        onScrollBeginDrag={onTouchStart}
-        onContentSizeChange={() => {
-          if (!didInitialScroll.current) {
-            didInitialScroll.current = true;
-            scrollRef.current?.scrollTo({ y: value * ITEM_HEIGHT, animated: false });
-          }
-        }}
-        contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
-      >
-        {Array.from({ length: count }, (_, i) => (
-          <TouchableOpacity
-            key={i}
-            activeOpacity={0.6}
-            style={styles.wheelItem}
-            onPress={() => {
-              Keyboard.dismiss();
-              scrollRef.current?.scrollTo({ y: i * ITEM_HEIGHT, animated: true });
-            }}
-          >
-            <Text style={[styles.wheelText, i === value && styles.wheelTextActive]}>{pad(i)}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
 
 function SquareToggle({ value, onPress }: { value: boolean; onPress: () => void }) {
   return (
@@ -127,40 +51,28 @@ export default function AlarmScreen() {
     const now = new Date();
     setEditor({
       editingId: null,
-      hours: now.getHours(),
-      minutes: now.getMinutes(),
-      label: '',
-      challenge: { ...DEFAULT_CHALLENGE },
+      draft: {
+        time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+        label: '',
+        challenge: { ...DEFAULT_CHALLENGE },
+        days: [...ALL_DAYS],
+      },
     });
   };
 
-  const openEditAlarm = (alarm: Alarm) => {
-    const [h, m] = parseTime(alarm.time);
+  const openEditAlarm = (alarm: Alarm) =>
     setEditor({
       editingId: alarm.id,
-      hours: h,
-      minutes: m,
-      label: alarm.label,
-      challenge: normalizeChallenge(alarm.challenge),
-    });
-  };
-
-  const closeEditor = () => {
-    Keyboard.dismiss();
-    setEditor(null);
-  };
-
-  const saveEditor = async () => {
-    if (!editor) return;
-    Keyboard.dismiss();
-    const draft = {
-      time: `${pad(editor.hours)}:${pad(editor.minutes)}`,
-      label: editor.label.trim() || 'Pobudka!',
-      challenge: {
-        ...editor.challenge,
-        phrase: editor.challenge.phrase.trim() || DEFAULT_PHRASE,
+      draft: {
+        time: alarm.time,
+        label: alarm.label,
+        challenge: normalizeChallenge(alarm.challenge),
+        days: alarm.days ?? [...ALL_DAYS],
       },
-    };
+    });
+
+  const saveEditor = async (draft: AlarmDraft) => {
+    if (!editor) return;
     if (editor.editingId) await updateAlarm(editor.editingId, draft);
     else await addAlarm(draft);
     setEditor(null);
@@ -191,7 +103,7 @@ export default function AlarmScreen() {
 
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={goHome} activeOpacity={0.7}>
-          <Text style={styles.backText}>←</Text>
+          <BackArrow />
         </TouchableOpacity>
         <Text style={styles.title}>Budzik</Text>
         <View style={styles.countBox}>
@@ -205,13 +117,14 @@ export default function AlarmScreen() {
         data={sortedAlarms}
         keyExtractor={item => item.id}
         contentContainerStyle={[styles.listContent, { paddingBottom: 110 + bottomInset }]}
+        ListHeaderComponent={<BedtimeRow />}
         ListEmptyComponent={
           <View style={styles.emptyBox}>
             <Text style={styles.emptyText}>Brak alarmów. Dodaj pierwszy poniżej.</Text>
           </View>
         }
         renderItem={({ item }) => {
-          const challengeText = describeChallenge(item.challenge);
+          const challengeText = [daysLabel(item.days), describeChallenge(item.challenge)].filter(Boolean).join(' · ');
           return (
             <TouchableOpacity style={styles.row} activeOpacity={0.7} onPress={() => openEditAlarm(item)}>
               <View style={[styles.timeCell, item.enabled && styles.timeCellOn]}>
@@ -244,70 +157,13 @@ export default function AlarmScreen() {
         <Text style={styles.addText}>Dodaj alarm</Text>
       </TouchableOpacity>
 
-      <Modal visible={editor !== null} animationType="slide" onRequestClose={closeEditor}>
-        {editor && (
-          <SafeAreaView style={styles.editor}>
-            <View style={styles.editorHeader}>
-              <TouchableOpacity style={styles.headerCellLeft} onPress={closeEditor}>
-                <Text style={styles.headerCancel}>Anuluj</Text>
-              </TouchableOpacity>
-              <View style={styles.headerCellCenter}>
-                <Text style={styles.editorTitle}>{editor.editingId ? 'Edytuj alarm' : 'Nowy alarm'}</Text>
-              </View>
-              <TouchableOpacity style={styles.headerCellRight} onPress={saveEditor}>
-                <Text style={styles.headerSave}>Zapisz</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={[styles.editorScroll, { paddingBottom: 32 + bottomInset }]} keyboardShouldPersistTaps="handled">
-              <TextInput
-                style={styles.input}
-                value={editor.label}
-                onChangeText={label => setEditor(prev => (prev ? { ...prev, label } : prev))}
-                placeholder="Nazwa alarmu (opcjonalnie)"
-                placeholderTextColor={MUTED}
-                maxLength={40}
-                returnKeyType="done"
-                blurOnSubmit
-                onSubmitEditing={Keyboard.dismiss}
-                autoCorrect={false}
-                selectionColor={INK}
-              />
-
-              <View style={styles.untilBar}>
-                <Text style={styles.untilText}>{timeUntil(editor.hours, editor.minutes)}</Text>
-              </View>
-
-              <View style={styles.wheelsBox}>
-                <Wheel
-                  count={24}
-                  value={editor.hours}
-                  onChange={hours => setEditor(prev => (prev ? { ...prev, hours } : prev))}
-                  onTouchStart={Keyboard.dismiss}
-                />
-                <Wheel
-                  count={60}
-                  value={editor.minutes}
-                  onChange={minutes => setEditor(prev => (prev ? { ...prev, minutes } : prev))}
-                  onTouchStart={Keyboard.dismiss}
-                  divided
-                />
-              </View>
-
-              <ChallengePicker
-                value={editor.challenge}
-                onChange={challenge => setEditor(prev => (prev ? { ...prev, challenge } : prev))}
-              />
-
-              {editor.editingId && (
-                <TouchableOpacity style={styles.deleteButton} onPress={confirmDelete}>
-                  <Text style={styles.deleteText}>Usuń alarm</Text>
-                </TouchableOpacity>
-              )}
-            </ScrollView>
-          </SafeAreaView>
-        )}
-      </Modal>
+      <AlarmEditor
+        draft={editor?.draft ?? null}
+        title={editor?.editingId ? 'Edytuj alarm' : 'Nowy alarm'}
+        onSave={saveEditor}
+        onClose={() => setEditor(null)}
+        onDelete={editor?.editingId ? confirmDelete : undefined}
+      />
     </SafeAreaView>
   );
 }
@@ -399,97 +255,4 @@ const styles = StyleSheet.create({
   addPlus: { fontSize: 36, fontWeight: '300', color: INK, marginRight: 12, lineHeight: 40 },
   addText: { fontSize: 20, fontWeight: '800', color: INK },
 
-  editor: {
-    flex: 1,
-    backgroundColor: PAPER,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
-  },
-  editorHeader: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    borderBottomWidth: LINE,
-    borderBottomColor: INK,
-    backgroundColor: WHITE,
-  },
-  headerCellLeft: {
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    borderRightWidth: LINE,
-    borderRightColor: INK,
-    justifyContent: 'center',
-  },
-  headerCellCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  headerCellRight: {
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    borderLeftWidth: LINE,
-    borderLeftColor: INK,
-    backgroundColor: YELLOW,
-    justifyContent: 'center',
-  },
-  editorTitle: { fontSize: 17, fontWeight: '800', color: INK },
-  headerCancel: { fontSize: 16, fontWeight: '600', color: INK },
-  headerSave: { fontSize: 16, fontWeight: '800', color: INK },
-  editorScroll: { paddingBottom: 32 },
-
-  input: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderWidth: LINE,
-    borderColor: INK,
-    borderRadius: 0,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    backgroundColor: WHITE,
-    fontSize: 18,
-    fontWeight: '600',
-    color: INK,
-  },
-
-  untilBar: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderWidth: LINE,
-    borderColor: INK,
-    backgroundColor: INK,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  untilText: { color: YELLOW, fontSize: 15, fontWeight: '700' },
-
-  wheelsBox: {
-    marginHorizontal: 16,
-    flexDirection: 'row',
-    borderWidth: LINE,
-    borderTopWidth: 0,
-    borderColor: INK,
-    backgroundColor: WHITE,
-  },
-  wheel: { flex: 1, height: WHEEL_HEIGHT },
-  wheelDivided: { borderLeftWidth: LINE, borderLeftColor: INK },
-  wheelItem: { height: ITEM_HEIGHT, justifyContent: 'center', alignItems: 'center' },
-  wheelText: { fontSize: 28, fontWeight: '600', color: '#B0B0AA', fontVariant: tabular },
-  wheelTextActive: { fontSize: 44, fontWeight: '900', color: INK },
-  wheelHighlight: {
-    position: 'absolute',
-    top: ITEM_HEIGHT * 2,
-    left: 0,
-    right: 0,
-    height: ITEM_HEIGHT,
-    backgroundColor: YELLOW,
-    borderTopWidth: LINE,
-    borderBottomWidth: LINE,
-    borderColor: INK,
-  },
-
-  deleteButton: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderWidth: LINE,
-    borderColor: INK,
-    backgroundColor: WHITE,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  deleteText: { color: DANGER, fontSize: 16, fontWeight: '800' },
 });

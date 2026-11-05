@@ -23,6 +23,12 @@ export interface RoutineTile {
   noteMode?: NoteMode;
   /** Tylko Notatnik w trybie 'pick'. */
   noteId?: string;
+  /** Tylko Budzik — alarm, którym steruje kafelek (godzina i nazwa kafelka są z nim synchronizowane). */
+  alarmId?: string;
+  /** Tylko Muzyka — zapisana playlista (brak = domyślna ★). */
+  musicId?: string;
+  /** Tylko Muzyka — otwórz playlistę od razu po wejściu w krok. */
+  autoOpen?: boolean;
 }
 
 export interface RoutineLink {
@@ -31,6 +37,11 @@ export interface RoutineLink {
 }
 
 export interface Routine {
+  id: string;
+  /** Np. „Dni robocze”, „Weekend”. */
+  name: string;
+  /** Dni tygodnia, w które obowiązuje plan (0 = nd … 6 = sb). Dzień należy do co najwyżej jednego planu. */
+  days: number[];
   tiles: RoutineTile[];
   links: RoutineLink[];
   /** Po wyłączeniu budzika plan startuje sam (jeśli zaczyna się od budzika). */

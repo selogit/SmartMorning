@@ -13,6 +13,7 @@ import {
   Linking,
   Keyboard,
 } from 'react-native';
+import BackArrow from '../ui/BackArrow';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { INK, YELLOW, PAPER, WHITE, MUTED, DANGER, LINE } from '../theme';
@@ -133,7 +134,7 @@ export default function WeatherScreen() {
       <StatusBar barStyle="dark-content" />
       <View style={s.header}>
         <TouchableOpacity style={s.backButton} onPress={goHome} activeOpacity={0.7}>
-          <Text style={s.backText}>←</Text>
+          <BackArrow />
         </TouchableOpacity>
         <Text style={s.title}>Pogoda</Text>
         {place && (

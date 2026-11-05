@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Accelerometer, Pedometer } from 'expo-sensors';
+import QrScanner from './QrScanner';
 import { INK, YELLOW, WHITE, DANGER, LINE } from '../theme';
 import {
   ChallengeConfig,
@@ -18,6 +19,8 @@ const SHAKE_THRESHOLD_G = 0.9;
 const SHAKE_DEBOUNCE_MS = 220;
 /** Po tylu sekundach przy zadaniu z czujnikiem pojawia się awaryjne wyjście (działanie). */
 const SENSOR_ESCAPE_AFTER_S = 30;
+/** Przy kodzie QR wyjście awaryjne pojawia się później — trzeba dać czas na dojście do kodu. */
+const QR_ESCAPE_AFTER_S = 60;
 
 const tabular = ['tabular-nums' as const];
 
@@ -323,6 +326,47 @@ function StepsChallenge({ target, onComplete, onUnavailable }: SensorProps) {
   );
 }
 
+/* ───────────── Kod QR ───────────── */
+
+interface QrProps {
+  expected: string;
+  label?: string;
+  onComplete: () => void;
+  onUnavailable: (reason: string) => void;
+}
+
+function QrChallenge({ expected, label, onComplete, onUnavailable }: QrProps) {
+  const [wrongAt, setWrongAt] = useState(0);
+  const [done, setDone] = useState(false);
+  const wrong = Date.now() - wrongAt < 2500;
+
+  useEffect(() => {
+    if (!wrongAt) return;
+    const t = setTimeout(() => setWrongAt(0), 2600);
+    return () => clearTimeout(t);
+  }, [wrongAt]);
+
+  return (
+    <View style={s.fill}>
+      <View style={[s.qrInfo, wrong && s.qrInfoWrong]}>
+        <Text style={s.qrInfoText}>
+          {wrong ? 'To nie ten kod — spróbuj swojego' : label ? `Idź do: ${label} i zeskanuj kod` : 'Zeskanuj swój kod'}
+        </Text>
+      </View>
+      <QrScanner
+        active={!done}
+        onScanned={data => {
+          if (data === expected) {
+            setDone(true);
+            onComplete();
+          } else setWrongAt(Date.now());
+        }}
+        onPermissionDenied={() => onUnavailable('Brak dostępu do aparatu.')}
+      />
+    </View>
+  );
+}
+
 /* ───────────── Pojedyncze zadanie (z awaryjnym działaniem) ───────────── */
 
 interface SingleProps {
@@ -335,20 +379,23 @@ function SingleChallenge({ kind, challenge, onComplete }: SingleProps) {
   const [fallback, setFallback] = useState<string | null>(null);
   const [showEscape, setShowEscape] = useState(false);
   const isSensor = kind === 'shake' || kind === 'steps';
+  const isQr = kind === 'qr';
+  const hasEscape = isSensor || isQr;
 
   useEffect(() => {
-    if (!isSensor) return;
-    const t = setTimeout(() => setShowEscape(true), SENSOR_ESCAPE_AFTER_S * 1000);
+    if (!hasEscape) return;
+    const t = setTimeout(() => setShowEscape(true), (isQr ? QR_ESCAPE_AFTER_S : SENSOR_ESCAPE_AFTER_S) * 1000);
     return () => clearTimeout(t);
-  }, [isSensor]);
+  }, [hasEscape]);
 
   let body: React.ReactNode = null;
   if (fallback !== null) {
+    // Wyjście awaryjne z QR jest trudniejsze — nie może być wygodniejsze niż wstanie z łóżka.
     body = (
       <MathChallenge
-        difficulty="medium"
-        count={1}
-        notice={`${fallback} Rozwiąż działanie, aby zaliczyć to zadanie.`}
+        difficulty={isQr ? 'hard' : 'medium'}
+        count={isQr ? 3 : 1}
+        notice={`${fallback} Rozwiąż ${isQr ? '3 działania' : 'działanie'}, aby zaliczyć to zadanie.`}
         onComplete={onComplete}
       />
     );
@@ -370,18 +417,31 @@ function SingleChallenge({ kind, challenge, onComplete }: SingleProps) {
     body = (
       <StepsChallenge target={challenge.stepCount} onComplete={onComplete} onUnavailable={setFallback} />
     );
+  } else if (kind === 'qr') {
+    body = challenge.qrValue ? (
+      <QrChallenge
+        expected={challenge.qrValue}
+        label={challenge.qrLabel}
+        onComplete={onComplete}
+        onUnavailable={setFallback}
+      />
+    ) : (
+      <MathChallenge difficulty="hard" count={3} notice="Kod nie był zapisany." onComplete={onComplete} />
+    );
   }
 
   return (
     <View style={s.fill}>
       {body}
-      {isSensor && showEscape && fallback === null && (
+      {hasEscape && showEscape && fallback === null && (
         <TouchableOpacity
           style={s.escape}
           activeOpacity={0.7}
-          onPress={() => setFallback('Czujnik nie reaguje?')}
+          onPress={() => setFallback(isQr ? 'Nie możesz zeskanować kodu?' : 'Czujnik nie reaguje?')}
         >
-          <Text style={s.escapeText}>Czujnik nie reaguje? Rozwiąż działanie</Text>
+          <Text style={s.escapeText}>
+            {isQr ? 'Nie możesz zeskanować? Rozwiąż 3 trudne działania' : 'Czujnik nie reaguje? Rozwiąż działanie'}
+          </Text>
         </TouchableOpacity>
       )}
     </View>
@@ -576,6 +636,9 @@ const s = StyleSheet.create({
   sensorTotal: { fontSize: 44, letterSpacing: 0 },
   sensorTitle: { color: WHITE, fontSize: 24, fontWeight: '900', marginHorizontal: 14, marginTop: 16 },
 
+  qrInfo: { backgroundColor: YELLOW, paddingHorizontal: 14, paddingVertical: 12 },
+  qrInfoWrong: { backgroundColor: DANGER },
+  qrInfoText: { color: INK, fontSize: 16, fontWeight: '900' },
   escape: {
     borderTopWidth: LINE,
     borderTopColor: YELLOW,

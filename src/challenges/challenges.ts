@@ -1,7 +1,9 @@
-export type ChallengeKind = 'math' | 'phrase' | 'shake' | 'steps';
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type ChallengeKind = 'math' | 'phrase' | 'shake' | 'steps' | 'qr';
+export type Difficulty = 'veryEasy' | 'easy' | 'medium' | 'hard' | 'expert';
 
-export const CHALLENGE_KINDS: ChallengeKind[] = ['math', 'phrase', 'shake', 'steps'];
+export const DIFFICULTIES: Difficulty[] = ['veryEasy', 'easy', 'medium', 'hard', 'expert'];
+
+export const CHALLENGE_KINDS: ChallengeKind[] = ['math', 'phrase', 'shake', 'steps', 'qr'];
 
 export interface ChallengeConfig {
   /** Zadania w kolejności wykonywania; pusta lista = brak zadań. */
@@ -11,6 +13,10 @@ export interface ChallengeConfig {
   phrase: string;
   shakeCount: number;
   stepCount: number;
+  /** Treść zarejestrowanego kodu (QR lub kreskowego), który wyłącza alarm. */
+  qrValue?: string;
+  /** Gdzie jest kod, np. „Łazienka” — podpowiedź na ekranie pobudki. */
+  qrLabel?: string;
 }
 
 export const DEFAULT_PHRASE = 'Wstaję i zaczynam dzień z energią';
@@ -24,15 +30,19 @@ export const DEFAULT_CHALLENGE: ChallengeConfig = {
   stepCount: 20,
 };
 
-export const MATH_COUNTS = [1, 3, 5];
-export const SHAKE_COUNTS = [15, 30, 60];
-export const STEP_COUNTS = [10, 20, 50];
+const range = (from: number, to: number, step = 1) =>
+  Array.from({ length: Math.floor((to - from) / step) + 1 }, (_, i) => from + i * step);
+
+export const MATH_COUNTS = range(1, 10);
+export const SHAKE_COUNTS = range(5, 100, 5);
+export const STEP_COUNTS = [...range(5, 100, 5), 120, 150, 200];
 
 export const CHALLENGE_OPTIONS: { type: ChallengeKind; title: string; hint: string }[] = [
   { type: 'math', title: 'Matematyka', hint: 'Rozwiąż działania' },
   { type: 'phrase', title: 'Fraza', hint: 'Przepisz zdanie bezbłędnie' },
   { type: 'shake', title: 'Potrząśnięcie', hint: 'Potrząśnij telefonem' },
   { type: 'steps', title: 'Kroki', hint: 'Przejdź kilka kroków' },
+  { type: 'qr', title: 'Kod QR', hint: 'Zeskanuj swój kod, np. w łazience' },
 ];
 
 export const CHALLENGE_TITLES: Record<ChallengeKind, string> = {
@@ -40,18 +50,23 @@ export const CHALLENGE_TITLES: Record<ChallengeKind, string> = {
   phrase: 'Fraza',
   shake: 'Potrząśnięcie',
   steps: 'Kroki',
+  qr: 'Kod QR',
 };
 
 export const DIFFICULTY_LABELS: Record<Difficulty, string> = {
+  veryEasy: 'Bardzo łatwy',
   easy: 'Łatwy',
   medium: 'Średni',
   hard: 'Trudny',
+  expert: 'Ekspert',
 };
 
 export const DIFFICULTY_EXAMPLES: Record<Difficulty, string> = {
+  veryEasy: 'np. 4 + 7',
   easy: 'np. 27 + 38',
   medium: 'np. 7 × 13 + 42',
   hard: 'np. 23 × 17 − 186',
+  expert: 'np. 17 × 9 + 14 × 6',
 };
 
 type StoredChallenge = Partial<ChallengeConfig> & { type?: string };
@@ -67,7 +82,9 @@ export const normalizeChallenge = (c?: StoredChallenge | null): ChallengeConfig 
   const { type, ...rest } = c ?? {};
   const raw: unknown[] = Array.isArray(rest.types) ? rest.types : type ? [type] : [];
   const types = raw.filter(isKind).filter((t, i, arr) => arr.indexOf(t) === i);
-  return { ...DEFAULT_CHALLENGE, ...rest, types };
+  const merged = { ...DEFAULT_CHALLENGE, ...rest, types };
+  if (!DIFFICULTIES.includes(merged.mathDifficulty)) merged.mathDifficulty = DEFAULT_CHALLENGE.mathDifficulty;
+  return merged;
 };
 
 const describeOne = (kind: ChallengeKind, ch: ChallengeConfig) => {
@@ -80,6 +97,8 @@ const describeOne = (kind: ChallengeKind, ch: ChallengeConfig) => {
       return `Potrząśnięcie · ${ch.shakeCount}×`;
     case 'steps':
       return `Kroki · ${ch.stepCount}`;
+    case 'qr':
+      return ch.qrLabel ? `Kod QR · ${ch.qrLabel}` : 'Kod QR';
   }
 };
 
@@ -98,6 +117,20 @@ export interface MathProblem {
 const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 export function generateMathProblem(difficulty: Difficulty): MathProblem {
+  if (difficulty === 'veryEasy') {
+    const a = rand(2, 9);
+    const b = rand(2, 9);
+    return { text: `${a} + ${b}`, answer: a + b };
+  }
+
+  if (difficulty === 'expert') {
+    const a = rand(12, 25);
+    const b = rand(6, 15);
+    const c = rand(11, 19);
+    const d = rand(3, 9);
+    return { text: `${a} × ${b} + ${c} × ${d}`, answer: a * b + c * d };
+  }
+
   if (difficulty === 'easy') {
     if (Math.random() < 0.5) {
       const a = rand(11, 59);

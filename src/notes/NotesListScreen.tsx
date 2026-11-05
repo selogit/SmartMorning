@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, SafeAreaView, StatusBar, Platform } from 'react-native';
+import BackArrow from '../ui/BackArrow';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { INK, YELLOW, PAPER, WHITE, MUTED, LINE } from '../theme';
@@ -83,7 +84,7 @@ export default function NotesListScreen() {
       <StatusBar barStyle="dark-content" />
       <View style={s.header}>
         <TouchableOpacity style={s.backButton} onPress={goHome} activeOpacity={0.7}>
-          <Text style={s.backText}>←</Text>
+          <BackArrow />
         </TouchableOpacity>
         <Text style={s.title}>Notatnik</Text>
         <View style={s.countBox}>

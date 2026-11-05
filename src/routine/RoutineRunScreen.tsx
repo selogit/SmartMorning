@@ -22,6 +22,9 @@ import { notesForDay, todayKey, useNotes } from '../notes/NotesProvider';
 import MarkdownView from '../notes/MarkdownView';
 import { toggleCheckAt } from '../notes/markdown';
 import WeatherCard from '../weather/WeatherCard';
+import NewsCard from '../news/NewsCard';
+import { useMusic } from '../music/MusicProvider';
+import { openMusic, serviceLabel } from '../music/services';
 
 const tabular = ['tabular-nums' as const];
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -45,12 +48,13 @@ const canOpen = (tile: RoutineTile) => {
 
 export default function RoutineRunScreen() {
   const bottomInset = useSafeAreaInsets().bottom;
-  const { routine } = useRoutine();
+  const { plans, todayPlan } = useRoutine();
   const { notes, updateNote, createNote } = useNotes();
   // Notatki utworzone w krokach „Nowa notatka” (indeks kroku → id), żeby po powrocie nie tworzyć kolejnej.
   const [createdNotes, setCreatedNotes] = useState<Record<number, string>>({});
   const todayNotes = useMemo(() => notesForDay(notes, todayKey()), [notes]);
-  const params = useLocalSearchParams<{ afterAlarm?: string }>();
+  const params = useLocalSearchParams<{ afterAlarm?: string; plan?: string }>();
+  const routine = plans.find(p => p.id === params.plan) ?? todayPlan;
   const chain = useMemo(() => orderedChain(routine), [routine]);
   const times = useMemo(() => scheduleTimes(chain), [chain]);
 
@@ -91,6 +95,21 @@ export default function RoutineRunScreen() {
   const info = current ? kindInfo(current.kind) : null;
   const isNotesStep = current?.kind === 'notes';
   const isWeatherStep = current?.kind === 'weather';
+  const isNewsStep = current?.kind === 'news';
+  const isMusicStep = current?.kind === 'music';
+  const music = useMusic();
+  const playlist = isMusicStep
+    ? music.items.find(i => i.id === (current?.musicId ?? music.defaultId)) ?? undefined
+    : undefined;
+  const [autoOpened, setAutoOpened] = useState<Record<number, boolean>>({});
+
+  // „Otwórz od razu”: przy wejściu w krok Muzyka otwórz playlistę (raz na krok).
+  useEffect(() => {
+    if (isMusicStep && current?.autoOpen && playlist && !autoOpened[index]) {
+      setAutoOpened(prev => ({ ...prev, [index]: true }));
+      openMusic(playlist.url).catch(() => {});
+    }
+  }, [index, isMusicStep, playlist?.id]);
   const noteMode = current?.noteMode ?? 'today';
   const createdId = createdNotes[index];
   const createdNote = createdId ? notes.find(n => n.id === createdId) : undefined;
@@ -121,6 +140,10 @@ export default function RoutineRunScreen() {
   }, [index, isNotesStep, noteMode]);
 
   const open = (tile: RoutineTile) => {
+    if (tile.kind === 'music' && playlist) {
+      openMusic(playlist.url).catch(() => router.push('/music'));
+      return;
+    }
     if (tile.kind === 'notes') {
       if (noteMode === 'new') {
         if (createdNote) router.push(`/notes/${createdNote.id}`);
@@ -137,6 +160,7 @@ export default function RoutineRunScreen() {
   };
 
   const openLabel = (tile: RoutineTile) => {
+    if (tile.kind === 'music') return playlist ? `▶ Odtwórz „${playlist.name}”` : 'Wybierz muzykę';
     if (tile.kind !== 'notes') return `Otwórz ${tile.title}`;
     if (noteMode === 'new') return createdNote ? 'Otwórz notatkę' : 'Napisz notatkę';
     return stepNotes.length === 1 ? 'Edytuj notatkę' : 'Otwórz Notatnik';
@@ -151,7 +175,9 @@ export default function RoutineRunScreen() {
           <Text style={s.closeText}>✕ Zakończ</Text>
         </TouchableOpacity>
         <View style={s.headerTitleCell}>
-          <Text style={s.headerTitle}>Plan dnia</Text>
+          <Text style={s.headerTitle} numberOfLines={1}>
+            {routine.name}
+          </Text>
         </View>
         <View style={s.progressCell}>
           <Text style={s.progressText}>
@@ -204,6 +230,25 @@ export default function RoutineRunScreen() {
             </ScrollView>
           )}
 
+          {isMusicStep && (
+            <View style={s.weatherPanel}>
+              <Text style={s.musicName} numberOfLines={2}>
+                {playlist ? playlist.name : 'Brak wybranej playlisty'}
+              </Text>
+              <Text style={s.musicMeta}>
+                {playlist
+                  ? `${serviceLabel(playlist.service)}${current?.autoOpen ? ' · otwiera się automatycznie' : ''}`
+                  : 'Dodaj playlistę w module Muzyka i oznacz ją ★.'}
+              </Text>
+            </View>
+          )}
+
+          {isNewsStep && (
+            <ScrollView style={s.newsPanel}>
+              <NewsCard count={6} tone="dark" />
+            </ScrollView>
+          )}
+
           {isWeatherStep && (
             <View style={s.weatherPanel}>
               <WeatherCard tone="dark" showHours />
@@ -223,7 +268,7 @@ export default function RoutineRunScreen() {
             </View>
           )}
 
-          {!isNotesStep || stepNotes.length === 0 ? <View style={s.spacer} /> : null}
+          {(!isNotesStep || stepNotes.length === 0) && !isNewsStep ? <View style={s.spacer} /> : null}
 
           {chain[index + 1] && (
             <Text style={s.nextText}>
@@ -300,6 +345,9 @@ const s = StyleSheet.create({
   spacer: { flex: 1 },
   notesPanel: { flex: 1, marginTop: 12, marginBottom: 12 },
   notesPanelContent: { paddingBottom: 4 },
+  musicName: { color: WHITE, fontSize: 22, fontWeight: '900' },
+  musicMeta: { color: '#9A9A94', fontSize: 13, fontWeight: '700', marginTop: 4 },
+  newsPanel: { flex: 1, marginTop: 12, marginBottom: 12, borderWidth: LINE, borderColor: YELLOW },
   weatherPanel: { marginTop: 12, borderWidth: LINE, borderColor: YELLOW, padding: 14 },
   notesEmpty: { color: '#9A9A94', fontSize: 15, fontWeight: '700', marginTop: 14, lineHeight: 21 },
   noteCard: { backgroundColor: PAPER, padding: 14, marginBottom: 10 },

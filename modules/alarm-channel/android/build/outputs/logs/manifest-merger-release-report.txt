@@ -1,0 +1,16 @@
+-- Merging decision tree log ---
+manifest
+ADDED from C:\Dev\SM\modules\alarm-channel\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest7358142825144153038.xml:2:13-83
+INJECTED from C:\Dev\SM\modules\alarm-channel\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest7358142825144153038.xml:2:13-83
+	package
+		INJECTED from C:\Dev\SM\modules\alarm-channel\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest7358142825144153038.xml
+	xmlns:android
+		ADDED from C:\Dev\SM\modules\alarm-channel\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest7358142825144153038.xml:2:23-81
+uses-sdk
+INJECTED from C:\Dev\SM\modules\alarm-channel\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest7358142825144153038.xml reason: use-sdk injection requested
+INJECTED from C:\Dev\SM\modules\alarm-channel\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest7358142825144153038.xml
+INJECTED from C:\Dev\SM\modules\alarm-channel\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest7358142825144153038.xml
+	android:targetSdkVersion
+		INJECTED from C:\Dev\SM\modules\alarm-channel\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest7358142825144153038.xml
+	android:minSdkVersion
+		INJECTED from C:\Dev\SM\modules\alarm-channel\android\build\intermediates\tmp\ProcessLibraryManifest\release\tempAndroidManifest7358142825144153038.xml
