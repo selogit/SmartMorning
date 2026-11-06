@@ -23,7 +23,11 @@ import MarkdownView from '../notes/MarkdownView';
 import { toggleCheckAt } from '../notes/markdown';
 import WeatherCard from '../weather/WeatherCard';
 import NewsCard from '../news/NewsCard';
+import TripStatusList from '../transit/TripStatusList';
+import { useTransit } from '../transit/TransitProvider';
 import { useMusic } from '../music/MusicProvider';
+import StepTimer from './StepTimer';
+import ChecklistStep from './ChecklistStep';
 import { openMusic, serviceLabel } from '../music/services';
 
 const tabular = ['tabular-nums' as const];
@@ -36,9 +40,11 @@ function openTile(tile: RoutineTile) {
     return;
   }
   const url = tile.url ?? info.url;
-  if (url) {
-    Linking.openURL(url).catch(() => Alert.alert('Nie udało się otworzyć', url));
-  }
+  if (!url) return;
+  const fail = () => Alert.alert('Nie udało się otworzyć', url);
+  // Najpierw aplikacja (jeśli kafelek ma jej link), a gdy jej nie ma — strona.
+  if (info.appUrl && !tile.url) Linking.openURL(info.appUrl).catch(() => Linking.openURL(url).catch(fail));
+  else Linking.openURL(url).catch(fail);
 }
 
 const canOpen = (tile: RoutineTile) => {
@@ -61,41 +67,31 @@ export default function RoutineRunScreen() {
   // Po wyłączeniu budzika pierwszy krok (Budzik) jest już zaliczony.
   const startIndex = params.afterAlarm === '1' && chain[0]?.kind === 'alarm' ? 1 : 0;
   const [index, setIndex] = useState(startIndex);
-  const [stepStartedAt, setStepStartedAt] = useState(() => Date.now());
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
 
   const finished = index >= chain.length;
   const current = finished ? null : chain[index];
 
   const goTo = (i: number) => {
     setIndex(i);
-    setStepStartedAt(Date.now());
   };
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
-
-  let countdown: { text: string; pct: number; over: boolean } | null = null;
-  if (current?.durationMin) {
-    const total = current.durationMin * 60;
-    const elapsed = Math.floor((now - stepStartedAt) / 1000);
-    const left = total - elapsed;
-    const abs = Math.abs(left);
-    countdown = {
-      text: `${left < 0 ? '+' : ''}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`,
-      pct: Math.min(1, Math.max(0, elapsed / total)),
-      over: left < 0,
-    };
-  }
 
   const info = current ? kindInfo(current.kind) : null;
   const isNotesStep = current?.kind === 'notes';
   const isWeatherStep = current?.kind === 'weather';
   const isNewsStep = current?.kind === 'news';
+  const isTransitStep = current?.kind === 'transit';
+  const isChecklistStep = current?.kind === 'checklist';
+  const transit = useTransit();
+
+  // Dojazd: sprawdź od razu po wejściu w krok i odświeżaj co 2 minuty (limit PLK: 100 zapytań/h).
+  useEffect(() => {
+    if (!isTransitStep) return;
+    transit.refresh();
+    const t = setInterval(() => transit.refresh(), 2 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [isTransitStep, index]);
   const isMusicStep = current?.kind === 'music';
   const music = useMusic();
   const playlist = isMusicStep
@@ -243,6 +239,12 @@ export default function RoutineRunScreen() {
             </View>
           )}
 
+          {isTransitStep && (
+            <ScrollView style={s.newsPanel}>
+              <TripStatusList tone="dark" />
+            </ScrollView>
+          )}
+
           {isNewsStep && (
             <ScrollView style={s.newsPanel}>
               <NewsCard count={6} tone="dark" />
@@ -255,20 +257,20 @@ export default function RoutineRunScreen() {
             </View>
           )}
 
-          {countdown && (
-            <View style={s.timer}>
-              <Text style={[s.timerText, countdown.over && s.timerOver]}>{countdown.text}</Text>
-              <View style={s.timerTrack}>
-                <View style={[s.timerFill, { flex: countdown.pct }]} />
-                <View style={{ flex: 1 - countdown.pct }} />
-              </View>
-              <Text style={s.timerHint}>
-                {countdown.over ? 'Czas minął — przejdź dalej, gdy skończysz' : `${current.durationMin} min na ten krok`}
-              </Text>
-            </View>
+          {isChecklistStep && <ChecklistStep tile={current} />}
+
+          {!!current.durationMin && (
+            <StepTimer
+              key={`${index}-${current.id}`}
+              minutes={current.durationMin}
+              title={current.title}
+              nextTitle={chain[index + 1]?.title}
+              autoNext={current.timerAutoNext}
+              onAutoNext={() => goTo(index + 1)}
+            />
           )}
 
-          {(!isNotesStep || stepNotes.length === 0) && !isNewsStep ? <View style={s.spacer} /> : null}
+          {(!isNotesStep || stepNotes.length === 0) && !isNewsStep && !isTransitStep && !isChecklistStep ? <View style={s.spacer} /> : null}
 
           {chain[index + 1] && (
             <Text style={s.nextText}>
@@ -335,12 +337,6 @@ const s = StyleSheet.create({
   cardTitle: { color: INK, fontSize: 44, fontWeight: '900', letterSpacing: -1 },
   cardDesc: { color: INK, fontSize: 16, fontWeight: '600', marginTop: 4 },
 
-  timer: { marginTop: 16, borderWidth: LINE, borderColor: YELLOW, padding: 14 },
-  timerText: { color: WHITE, fontSize: 56, fontWeight: '900', fontVariant: tabular },
-  timerOver: { color: YELLOW },
-  timerTrack: { flexDirection: 'row', height: 10, borderWidth: LINE, borderColor: YELLOW, marginTop: 8 },
-  timerFill: { backgroundColor: YELLOW },
-  timerHint: { color: '#9A9A94', fontSize: 13, marginTop: 8 },
 
   spacer: { flex: 1 },
   notesPanel: { flex: 1, marginTop: 12, marginBottom: 12 },

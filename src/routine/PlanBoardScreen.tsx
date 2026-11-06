@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,33 +14,31 @@ import {
   Alert,
   LayoutChangeEvent,
   TextInput,
+  ScrollViewInstance,
+  Animated,
+  LayoutAnimation,
 } from 'react-native';
 import BackArrow from '../ui/BackArrow';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { INK, YELLOW, PAPER, WHITE, MUTED, DANGER, LINE } from '../theme';
 import { useRoutine } from './RoutineProvider';
-import { RoutineTile } from './types';
-import { connectTiles, disconnectTile, orderedChain, removeTile, scheduleTimes } from './chain';
+import { Routine, RoutineTile, TileSize } from './types';
+import { moveTile, removeTile, scheduleTimes } from './chain';
 import { makeTile } from './storage';
 import { CATEGORY_LABELS, TILE_KINDS, TileCategory, TileKind, isSoon, kindInfo } from './tileKinds';
+import { Cell, GRID_COLS, SIZE_LABELS, cellAt, layoutGrid } from './grid';
 import TileEditor from './TileEditor';
 import { useAlarms } from '../alarm/AlarmProvider';
 import { DAY_ORDER, DAY_SHORT, daysLabel } from '../alarm/time';
-import { Routine } from './types';
 
-const TILE_W = 128;
-const TILE_H = 74;
-const EDGE_GAP = 4;
-const ARROW_L = 12;
-const ARROW_HW = 7;
-const EDGE_THICK = 3;
-const GRID = 32;
+const PAD = 10;
+const GAP = 6;
 const DRAG_THRESHOLD = 6;
+const SWAP_COOLDOWN = 220;
+const SIZES: TileSize[] = ['small', 'medium', 'large'];
 
-type Point = { x: number; y: number };
-
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+type Rect = { x: number; y: number; w: number; h: number };
 
 function useLatest<T>(value: T) {
   const ref = useRef(value);
@@ -48,93 +46,36 @@ function useLatest<T>(value: T) {
   return ref;
 }
 
-/* ───────────── Strzałka między kafelkami ───────────── */
-
-function Edge({ a, b, active }: { a: Point; b: Point; active: boolean }) {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const dist = Math.hypot(dx, dy);
-  if (dist < 1) return null;
-  const ux = dx / dist;
-  const uy = dy / dist;
-  // Odległość od środka do krawędzi prostokąta w kierunku strzałki.
-  const clip = Math.min(
-    ux !== 0 ? (TILE_W / 2 + EDGE_GAP) / Math.abs(ux) : Infinity,
-    uy !== 0 ? (TILE_H / 2 + EDGE_GAP) / Math.abs(uy) : Infinity
-  );
-  if (dist <= clip * 2 + ARROW_L) return null; // kafelki nachodzą na siebie
-
-  const sx = a.x + ux * clip;
-  const sy = a.y + uy * clip;
-  const ex = b.x - ux * clip;
-  const ey = b.y - uy * clip;
-  const lineEndX = ex - ux * ARROW_L;
-  const lineEndY = ey - uy * ARROW_L;
-  const lineLen = Math.hypot(lineEndX - sx, lineEndY - sy);
-  const angle = `${Math.atan2(dy, dx)}rad`;
-  const color = active ? INK : MUTED;
-
-  const arrowCx = ex - (ux * ARROW_L) / 2;
-  const arrowCy = ey - (uy * ARROW_L) / 2;
-
-  return (
-    <>
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: (sx + lineEndX) / 2 - lineLen / 2,
-          top: (sy + lineEndY) / 2 - EDGE_THICK / 2,
-          width: lineLen,
-          height: EDGE_THICK,
-          backgroundColor: color,
-          transform: [{ rotate: angle }],
-        }}
-      />
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: arrowCx - ARROW_L / 2,
-          top: arrowCy - ARROW_HW,
-          width: 0,
-          height: 0,
-          borderLeftWidth: ARROW_L,
-          borderTopWidth: ARROW_HW,
-          borderBottomWidth: ARROW_HW,
-          borderLeftColor: color,
-          borderTopColor: 'transparent',
-          borderBottomColor: 'transparent',
-          transform: [{ rotate: angle }],
-        }}
-      />
-    </>
-  );
-}
-
-/* ───────────── Kafelek z przeciąganiem ───────────── */
+/* ───────────── Kafelek ───────────── */
 
 interface TileViewProps {
   tile: RoutineTile;
-  pos: Point;
-  order: number | null;
+  index: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  compact: boolean;
+  large: boolean;
   time: string | null;
+  editMode: boolean;
   selected: boolean;
-  connectSource: boolean;
-  connecting: boolean;
-  onDrag: (id: string, x: number, y: number) => void;
+  /** Przesunięcie palca (tylko przeciągany kafelek) — animowane natywnie, bez przerysowywania ekranu. */
+  pan: Animated.ValueXY | null;
+  onPress: (id: string) => void;
+  onLongPress: (id: string) => void;
+  onDragStart: (id: string) => void;
+  onDragMove: (dx: number, dy: number) => void;
   onDragEnd: () => void;
-  onTap: (id: string) => void;
   /** Tylko Budzik: on = alarm włączony, off = wyłączony, none = brak połączonego alarmu. */
   alarmState?: 'on' | 'off' | 'none';
 }
 
-function TileView(props: TileViewProps) {
-  const { tile, pos, order, time, selected, connectSource, connecting } = props;
+const TileView = memo(function TileView(props: TileViewProps) {
+  const { tile, index, x, y, w, h, compact, large, time, editMode, selected, pan } = props;
   const latest = useLatest(props);
-  const start = useRef<Point>({ x: 0, y: 0 });
   const moved = useRef(false);
-  const [dragging, setDragging] = useState(false);
+  const draggable = editMode && selected;
 
   const responder = useMemo(
     () =>
@@ -143,27 +84,23 @@ function TileView(props: TileViewProps) {
         onMoveShouldSetPanResponder: () => true,
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
-          start.current = { ...latest.current.pos };
           moved.current = false;
         },
         onPanResponderMove: (_, g) => {
           if (!moved.current && Math.abs(g.dx) + Math.abs(g.dy) > DRAG_THRESHOLD) {
             moved.current = true;
-            setDragging(true);
+            latest.current.onDragStart(latest.current.tile.id);
           }
-          if (moved.current) {
-            latest.current.onDrag(latest.current.tile.id, start.current.x + g.dx, start.current.y + g.dy);
-          }
+          if (moved.current) latest.current.onDragMove(g.dx, g.dy);
         },
         onPanResponderRelease: () => {
           if (moved.current) latest.current.onDragEnd();
-          else latest.current.onTap(latest.current.tile.id);
+          else latest.current.onPress(latest.current.tile.id);
           moved.current = false;
-          setDragging(false);
         },
         onPanResponderTerminate: () => {
+          if (moved.current) latest.current.onDragEnd();
           moved.current = false;
-          setDragging(false);
         },
       }),
     []
@@ -171,12 +108,13 @@ function TileView(props: TileViewProps) {
 
   const info = kindInfo(tile.kind);
   const soon = isSoon(info);
-  const noteHint =
+  const dark = info.category === 'task';
+  const hint =
     tile.kind === 'notes'
       ? tile.noteMode === 'pick'
-        ? 'wybrana'
+        ? 'wybrana notatka'
         : tile.noteMode === 'new'
-          ? 'nowa'
+          ? 'nowa notatka'
           : null
       : tile.kind === 'alarm'
         ? props.alarmState === 'off'
@@ -185,40 +123,73 @@ function TileView(props: TileViewProps) {
             ? 'bez alarmu'
             : null
         : null;
-  const meta = [time, tile.durationMin ? `${tile.durationMin} min` : null, noteHint].filter(Boolean).join(' · ');
+  const meta = [time, tile.durationMin ? `⏱ ${tile.durationMin} min` : null, hint].filter(Boolean).join(' · ');
 
-  return (
-    <View
-      {...responder.panHandlers}
-      style={[
-        s.tile,
-        info.category === 'module' && s.tileModule,
-        info.category === 'app' && s.tileApp,
-        info.category === 'task' && s.tileTask,
-        { left: pos.x, top: pos.y },
-        order === null && s.tileDetached,
-        (selected || dragging) && s.tileLifted,
-        connectSource && s.tileConnectSource,
-        connecting && !connectSource && s.tileConnectTarget,
-      ]}
-    >
-      <View style={s.tileHeader}>
-        <View style={[s.orderBadge, order === null && s.orderBadgeEmpty]}>
-          <Text style={s.orderText}>{order ?? '–'}</Text>
-        </View>
-        <Text style={[s.tileCategory, info.category === 'task' && s.onInk]} numberOfLines={1}>
-          {soon ? 'WKRÓTCE' : CATEGORY_LABELS[info.category].toUpperCase()}
-        </Text>
+  const body = (
+    <>
+      <View style={s.tileTop}>
+        <Text style={[s.num, compact && s.numSmall, dark && s.onInkStrong]}>{index + 1}</Text>
+        {!compact && (
+          <Text style={[s.tileCategory, dark && s.onInk]} numberOfLines={1}>
+            {soon ? 'WKRÓTCE' : CATEGORY_LABELS[info.category].toUpperCase()}
+          </Text>
+        )}
       </View>
-      <Text style={[s.tileTitle, info.category === 'task' && s.onInkStrong]} numberOfLines={1}>
-        {tile.title}
-      </Text>
-      <Text style={[s.tileMeta, info.category === 'task' && s.onInk]} numberOfLines={1}>
-        {meta || 'bez czasu'}
-      </Text>
-    </View>
+      <View>
+        <Text
+          style={[s.tileTitle, compact && s.tileTitleSmall, large && s.tileTitleLarge, dark && s.onInkStrong]}
+          numberOfLines={2}
+        >
+          {tile.title}
+        </Text>
+        {large && (
+          <Text style={[s.tileDesc, dark && s.onInk]} numberOfLines={1}>
+            {info.description}
+          </Text>
+        )}
+        {!!meta && (
+          <Text style={[s.tileMeta, compact && s.tileMetaSmall, dark && s.onInk]} numberOfLines={1}>
+            {compact ? time ?? (tile.durationMin ? `⏱${tile.durationMin}` : '') : meta}
+          </Text>
+        )}
+      </View>
+      {selected && <View style={s.selMark} pointerEvents="none"><Text style={s.selMarkText}>✓</Text></View>}
+    </>
   );
-}
+
+  const style = [
+    s.tile,
+    info.category === 'module' && s.tileModule,
+    info.category === 'app' && s.tileApp,
+    dark && s.tileTask,
+    { left: x, top: y, width: w, height: h },
+    compact && s.tileCompact,
+    editMode && !selected && s.tileEditing,
+    selected && s.tileSelected,
+    pan && s.tileDragging,
+  ];
+
+  if (draggable) {
+    return (
+      <Animated.View
+        {...responder.panHandlers}
+        style={[...style, pan && { transform: pan.getTranslateTransform() }]}
+      >
+        {body}
+      </Animated.View>
+    );
+  }
+  return (
+    <Pressable
+      style={({ pressed }) => [...style, pressed && s.tilePressed]}
+      onPress={() => props.onPress(tile.id)}
+      onLongPress={() => props.onLongPress(tile.id)}
+      delayLongPress={350}
+    >
+      {body}
+    </Pressable>
+  );
+});
 
 /* ───────────── Ekran planszy ───────────── */
 
@@ -235,7 +206,6 @@ export default function PlanBoardScreen() {
   const switchPlan = (id: string) => {
     setPlanId(id);
     setSelectedId(null);
-    setConnectFrom(null);
   };
 
   const openSettings = () => {
@@ -268,86 +238,132 @@ export default function PlanBoardScreen() {
   };
   const { alarms } = useAlarms();
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const [editMode, setEditMode] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const [editing, setEditing] = useState<RoutineTile | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Przeciąganie: kolejność trzymana lokalnie i zapisywana do planu dopiero po puszczeniu kafelka.
+  const [drag, setDrag] = useState<{ id: string; start: Rect } | null>(null);
+  const [dragOrder, setDragOrder] = useState<string[] | null>(null);
+  const pan = useRef(new Animated.ValueXY()).current;
+  const lastSwap = useRef(0);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
-  const chain = useMemo(() => orderedChain(routine), [routine]);
-  const times = useMemo(() => scheduleTimes(chain), [chain]);
-  const orderOf = useMemo(() => new Map(chain.map((t, i) => [t.id, i])), [chain]);
-  const chainLinks = useMemo(() => {
-    const ids = new Set(chain.map(t => t.id));
-    return new Set(routine.links.filter(l => ids.has(l.from) && ids.has(l.to)).map(l => `${l.from}>${l.to}`));
-  }, [chain, routine.links]);
+  const tiles = useMemo(() => {
+    if (!dragOrder) return routine.tiles;
+    const byId = new Map(routine.tiles.map(t => [t.id, t]));
+    return dragOrder.map(id => byId.get(id)).filter((t): t is RoutineTile => !!t);
+  }, [routine.tiles, dragOrder]);
+  const times = useMemo(() => scheduleTimes(tiles), [tiles]);
+  const { cells, rows } = useMemo(() => layoutGrid(tiles.map(t => t.size ?? 'medium')), [tiles]);
 
-  const rangeX = Math.max(1, size.w - TILE_W);
-  const rangeY = Math.max(1, size.h - TILE_H);
-  const toPx = (t: RoutineTile): Point => ({ x: clamp01(t.x) * rangeX, y: clamp01(t.y) * rangeY });
-  const center = (t: RoutineTile): Point => {
-    const p = toPx(t);
-    return { x: p.x + TILE_W / 2, y: p.y + TILE_H / 2 };
-  };
+  // Siatka 4 kolumn na całą szerokość; przy niewielu rzędach kafelki wyciągają się na wysokość planszy.
+  const colW = size.w > 0 ? (size.w - 2 * PAD + GAP) / GRID_COLS : 0;
+  const fitH = rows > 0 ? (size.h - 2 * PAD + GAP) / rows : colW;
+  const rowH = Math.max(colW, Math.min(colW * 1.6, fitH));
+  const rectOf = (c: Cell): Rect => ({
+    x: PAD + c.col * colW,
+    y: PAD + c.row * rowH,
+    w: c.w * colW - GAP,
+    h: c.h * rowH - GAP,
+  });
+  const contentH = rows * rowH + 2 * PAD - GAP;
 
-  const selected = routine.tiles.find(t => t.id === selectedId) ?? null;
-  const connectSource = routine.tiles.find(t => t.id === connectFrom) ?? null;
+  const selected = tiles.find(t => t.id === selectedId) ?? null;
+  const selectedIndex = selected ? tiles.indexOf(selected) : -1;
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setSize({ w: width, h: height });
   };
 
-  const onDrag = (id: string, px: number, py: number) => {
-    setRoutine(r => ({
-      ...r,
-      tiles: r.tiles.map(t => (t.id === id ? { ...t, x: clamp01(px / rangeX), y: clamp01(py / rangeY) } : t)),
-    }));
+  const enterEdit = (id: string | null) => {
+    setEditMode(true);
+    setSelectedId(id);
+  };
+  const exitEdit = () => {
+    setEditMode(false);
+    setSelectedId(null);
+    setDrag(null);
+    setDragOrder(null);
   };
 
-  const onTap = (id: string) => {
-    if (connectFrom) {
-      if (id === connectFrom) {
-        setConnectFrom(null);
-        return;
-      }
-      const result = connectTiles(routine, connectFrom, id);
-      if ('error' in result) {
-        Alert.alert('Nie można połączyć', result.error);
-        return;
-      }
-      setRoutine(result.routine);
-      setConnectFrom(null);
-      setSelectedId(id);
+  // Aktualne wartości dla stabilnych callbacków (kafelki są memo i nie przerysowują się bez potrzeby).
+  const live = useLatest({ tiles, cells, colW, rowH, editMode, drag, rectOf });
+
+  const onPress = useCallback((id: string) => {
+    const { tiles: list, editMode: editing } = live.current;
+    if (!editing) {
+      const t = list.find(x => x.id === id);
+      if (t) setEditing(t);
       return;
     }
     setSelectedId(prev => (prev === id ? null : id));
+  }, []);
+
+  const onLongPress = useCallback((id: string) => enterEdit(id), []);
+
+  const onDragStart = useCallback((id: string) => {
+    const { tiles: list, cells: cs, rectOf: r } = live.current;
+    const i = list.findIndex(t => t.id === id);
+    if (i < 0) return;
+    pan.setValue({ x: 0, y: 0 });
+    setDragOrder(list.map(t => t.id));
+    setDrag({ id, start: r(cs[i]) });
+  }, []);
+
+  const onDragMove = useCallback((dx: number, dy: number) => {
+    pan.setValue({ x: dx, y: dy });
+    const { drag: d, tiles: list, cells: cs, colW: cw, rowH: rh } = live.current;
+    if (!d || cw === 0) return;
+    const now = Date.now();
+    if (now - lastSwap.current < SWAP_COOLDOWN) return;
+    const cx = d.start.x + d.start.w / 2 + dx;
+    const cy = d.start.y + d.start.h / 2 + dy;
+    const target = cellAt(cs, Math.floor((cx - PAD) / cw), Math.floor((cy - PAD) / rh));
+    const from = list.findIndex(t => t.id === d.id);
+    if (target < 0 || from < 0 || target === from) return;
+    lastSwap.current = now;
+    LayoutAnimation.configureNext(LayoutAnimation.create(160, 'easeInEaseOut', 'scaleXY'));
+    setDragOrder(moveTile(list.map(t => t.id), from, target));
+  }, []);
+
+  const onDragEnd = useCallback(() => {
+    const { tiles: list } = live.current;
+    const ids = list.map(t => t.id);
+    setRoutine(r => {
+      const byId = new Map(r.tiles.map(t => [t.id, t]));
+      const ordered = ids.map(id => byId.get(id)).filter((t): t is RoutineTile => !!t);
+      const rest = r.tiles.filter(t => !ids.includes(t.id));
+      return { ...r, tiles: [...ordered, ...rest] };
+    });
+    LayoutAnimation.configureNext(LayoutAnimation.create(140, 'easeInEaseOut', 'opacity'));
+    setDrag(null);
+    setDragOrder(null);
+    pan.setValue({ x: 0, y: 0 });
+  }, [routine.id]);
+
+  const shift = (dir: -1 | 1) => {
+    if (selectedIndex < 0) return;
+    setRoutine(r => ({ ...r, tiles: moveTile(r.tiles, selectedIndex, selectedIndex + dir) }));
   };
 
-  const clearSelection = () => {
-    setSelectedId(null);
-    setConnectFrom(null);
+  const resize = (sz: TileSize) => {
+    if (!selected) return;
+    setRoutine(r => ({ ...r, tiles: r.tiles.map(t => (t.id === selected.id ? { ...t, size: sz } : t)) }));
   };
 
   const addTile = (kind: TileKind) => {
     setPaletteOpen(false);
-    // Nowy kafelek na środku, lekko przesunięty przy kolejnych dodaniach, żeby się nie nakładały.
-    const n = routine.tiles.length;
-    const tile = makeTile(kind, clamp01(0.5 + ((n % 3) - 1) * 0.12), clamp01(0.5 + ((n % 4) - 1.5) * 0.08));
-    setRoutine(r => {
-      const next = { ...r, tiles: [...r.tiles, tile] };
-      // Wygodny skrót: nowy kafelek doczepia się na końcu planu.
-      const current = orderedChain(r);
-      const last = current[current.length - 1];
-      if (!last) return next;
-      const res = connectTiles(next, last.id, tile.id);
-      return 'routine' in res ? res.routine : next;
-    });
-    setSelectedId(tile.id);
+    const tile = makeTile(kind);
+    setRoutine(r => ({ ...r, tiles: [...r.tiles, tile] }));
+    enterEdit(tile.id);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
   };
 
   const deleteSelected = () => {
     if (!selected) return;
-    Alert.alert(`Usunąć „${selected.title}”?`, 'Sąsiednie kafelki zostaną połączone ze sobą.', [
+    Alert.alert(`Usunąć „${selected.title}”?`, 'Kolejne kafelki przesuną się o jedno miejsce.', [
       { text: 'Anuluj', style: 'cancel' },
       {
         text: 'Usuń',
@@ -361,14 +377,6 @@ export default function PlanBoardScreen() {
   };
 
   const goHome = () => (router.canGoBack() ? router.back() : router.replace('/'));
-
-  const gridLines = useMemo(() => {
-    const lines: React.ReactNode[] = [];
-    for (let x = GRID; x < size.w; x += GRID) lines.push(<View key={`v${x}`} style={[s.gridV, { left: x }]} />);
-    for (let y = GRID; y < size.h; y += GRID) lines.push(<View key={`h${y}`} style={[s.gridH, { top: y }]} />);
-    return lines;
-  }, [size.w, size.h]);
-
   const categories: TileCategory[] = ['module', 'app', 'task'];
 
   return (
@@ -380,11 +388,13 @@ export default function PlanBoardScreen() {
           <BackArrow />
         </TouchableOpacity>
         <Text style={s.title}>Plan dnia</Text>
-        <View style={s.countBox}>
-          <Text style={s.countText}>
-            {chain.length}/{routine.tiles.length} w planie
-          </Text>
-        </View>
+        <TouchableOpacity
+          style={[s.countBox, editMode && s.countBoxInk]}
+          onPress={() => (editMode ? exitEdit() : enterEdit(null))}
+          activeOpacity={0.7}
+        >
+          <Text style={[s.countText, editMode && s.onInkStrong]}>{editMode ? 'Gotowe ✓' : 'Edytuj układ'}</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -430,51 +440,47 @@ export default function PlanBoardScreen() {
         <Text style={s.optionText}>Uruchom plan po wyłączeniu budzika</Text>
       </TouchableOpacity>
 
-      {connectSource ? (
-        <View style={s.banner}>
-          <Text style={s.bannerText} numberOfLines={2}>
-            Dotknij kafelek, który ma być po „{connectSource.title}”
-          </Text>
-          <TouchableOpacity style={s.bannerButton} onPress={() => setConnectFrom(null)}>
-            <Text style={s.bannerButtonText}>Anuluj</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={s.hintBar}>
-          <Text style={s.hintText}>Przeciągaj kafelki · dotknij, aby połączyć lub edytować</Text>
-        </View>
-      )}
+      <View style={[s.hintBar, editMode && s.hintBarEdit]}>
+        <Text style={[s.hintText, editMode && s.hintTextEdit]} numberOfLines={2}>
+          {!editMode
+            ? 'Numery to kolejność kroków · dotknij kafelek, by zmienić opcje · przytrzymaj, by edytować układ'
+            : selected
+              ? 'Przeciągnij zaznaczony kafelek na inne miejsce albo użyj strzałek · wybierz rozmiar poniżej'
+              : 'Dotknij kafelek, by go zaznaczyć'}
+        </Text>
+      </View>
 
-      <Pressable style={s.canvas} onLayout={onLayout} onPress={clearSelection}>
-        {gridLines}
-        {size.w > 0 &&
-          routine.links.map(l => {
-            const a = routine.tiles.find(t => t.id === l.from);
-            const b = routine.tiles.find(t => t.id === l.to);
-            if (!a || !b) return null;
-            return (
-              <Edge key={`${l.from}>${l.to}`} a={center(a)} b={center(b)} active={chainLinks.has(`${l.from}>${l.to}`)} />
-            );
-          })}
-        {size.w > 0 &&
-          // Zaznaczony kafelek rysujemy na końcu, żeby był na wierzchu.
-          [...routine.tiles]
-            .sort((a, b) => Number(a.id === selectedId) - Number(b.id === selectedId))
-            .map(t => {
-              const idx = orderOf.get(t.id);
+      <View style={s.board} onLayout={onLayout}>
+        <ScrollView
+          ref={scrollRef}
+          scrollEnabled={!drag && !(editMode && selected)}
+          contentContainerStyle={{ height: Math.max(contentH, size.h) }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {colW > 0 &&
+            tiles.map((t, i) => {
+              const dragging = drag?.id === t.id;
+              const rect = dragging && drag ? drag.start : rectOf(cells[i]);
               return (
                 <TileView
                   key={t.id}
                   tile={t}
-                  pos={toPx(t)}
-                  order={idx === undefined ? null : idx + 1}
-                  time={idx === undefined ? t.time ?? null : times[idx]}
+                  index={i}
+                  x={rect.x}
+                  y={rect.y}
+                  w={rect.w}
+                  h={rect.h}
+                  compact={cells[i].w === 1 && cells[i].h === 1}
+                  large={cells[i].w >= 3}
+                  time={times[i]}
+                  editMode={editMode}
                   selected={t.id === selectedId}
-                  connectSource={t.id === connectFrom}
-                  connecting={connectFrom !== null}
-                  onDrag={onDrag}
-                  onDragEnd={() => {}}
-                  onTap={onTap}
+                  pan={dragging ? pan : null}
+                  onPress={onPress}
+                  onLongPress={onLongPress}
+                  onDragStart={onDragStart}
+                  onDragMove={onDragMove}
+                  onDragEnd={onDragEnd}
                   alarmState={
                     t.kind !== 'alarm'
                       ? undefined
@@ -487,43 +493,71 @@ export default function PlanBoardScreen() {
                 />
               );
             })}
-        {routine.tiles.length === 0 && (
-          <View style={s.empty} pointerEvents="none">
-            <Text style={s.emptyText}>Pusta plansza. Dodaj pierwszy kafelek poniżej.</Text>
-          </View>
-        )}
-      </Pressable>
+          {tiles.length === 0 && (
+            <View style={s.empty} pointerEvents="none">
+              <Text style={s.emptyText}>Pusta plansza. Dodaj pierwszy kafelek poniżej.</Text>
+            </View>
+          )}
+        </ScrollView>
+      </View>
 
-      {selected && !connectSource ? (
-        <View style={[s.actions, { paddingBottom: bottomInset }]}>
-          <TouchableOpacity style={[s.action, s.actionPrimary]} onPress={() => setConnectFrom(selected.id)}>
-            <Text style={s.actionText}>Połącz →</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[s.action, s.actionDivided]} onPress={() => setEditing(selected)}>
-            <Text style={s.actionText}>Edytuj</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.action, s.actionDivided]}
-            onPress={() => setRoutine(r => disconnectTile(r, selected.id))}
-          >
-            <Text style={s.actionText}>Odłącz</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[s.action, s.actionDivided]} onPress={deleteSelected}>
-            <Text style={[s.actionText, s.danger]}>Usuń</Text>
-          </TouchableOpacity>
+      {editMode && selected ? (
+        <View style={{ paddingBottom: bottomInset, backgroundColor: WHITE }}>
+          <View style={s.actions}>
+            {SIZES.map((sz, i) => {
+              const on = (selected.size ?? 'medium') === sz;
+              return (
+                <TouchableOpacity
+                  key={sz}
+                  style={[s.action, i > 0 && s.actionDivided, on && s.actionInk]}
+                  onPress={() => resize(sz)}
+                >
+                  <Text style={[s.actionText, on && s.onInkStrong]}>{SIZE_LABELS[sz]}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <View style={s.actions}>
+            <TouchableOpacity
+              style={[s.action, selectedIndex <= 0 && s.disabled]}
+              disabled={selectedIndex <= 0}
+              onPress={() => shift(-1)}
+            >
+              <Text style={s.actionText}>← Wcześniej</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.action, s.actionDivided, selectedIndex >= tiles.length - 1 && s.disabled]}
+              disabled={selectedIndex >= tiles.length - 1}
+              onPress={() => shift(1)}
+            >
+              <Text style={s.actionText}>Później →</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.action, s.actionDivided]} onPress={() => setEditing(selected)}>
+              <Text style={s.actionText}>Opcje</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.action, s.actionDivided]} onPress={deleteSelected}>
+              <Text style={[s.actionText, s.danger]}>Usuń</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : (
         <View style={[s.actions, { paddingBottom: bottomInset }]}>
           <TouchableOpacity style={[s.action, s.actionPrimary]} onPress={() => setPaletteOpen(true)}>
             <Text style={s.actionTextBig}>+ Dodaj kafelek</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.action, s.actionDivided, s.actionInk, chain.length === 0 && s.disabled]}
-            disabled={chain.length === 0}
-            onPress={() => router.push(`/plan-run?plan=${routine.id}`)}
-          >
-            <Text style={[s.actionTextBig, s.onInkStrong]}>▶ Uruchom</Text>
-          </TouchableOpacity>
+          {editMode ? (
+            <TouchableOpacity style={[s.action, s.actionDivided, s.actionInk]} onPress={exitEdit}>
+              <Text style={[s.actionTextBig, s.onInkStrong]}>Gotowe ✓</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[s.action, s.actionDivided, s.actionInk, tiles.length === 0 && s.disabled]}
+              disabled={tiles.length === 0}
+              onPress={() => router.push(`/plan-run?plan=${routine.id}`)}
+            >
+              <Text style={[s.actionTextBig, s.onInkStrong]}>▶ Uruchom</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -719,65 +753,56 @@ const s = StyleSheet.create({
 
   hintBar: { paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: LINE, borderBottomColor: INK },
   hintText: { fontSize: 12, fontWeight: '700', color: MUTED },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: YELLOW,
-    borderBottomWidth: LINE,
-    borderBottomColor: INK,
-    paddingLeft: 16,
-  },
-  bannerText: { flex: 1, fontSize: 14, fontWeight: '800', color: INK, paddingVertical: 10 },
-  bannerButton: { paddingHorizontal: 16, paddingVertical: 12, borderLeftWidth: LINE, borderLeftColor: INK },
-  bannerButtonText: { fontSize: 14, fontWeight: '800', color: INK },
+  countBoxInk: { backgroundColor: INK },
+  hintBarEdit: { backgroundColor: YELLOW },
+  hintTextEdit: { color: INK },
 
-  canvas: { flex: 1, margin: 12, overflow: 'hidden' },
-  gridV: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(17,17,17,0.07)' },
-  gridH: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: 'rgba(17,17,17,0.07)' },
-  empty: { position: 'absolute', left: 0, right: 0, top: '40%', alignItems: 'center' },
+  board: { flex: 1 },
+  empty: { position: 'absolute', left: 0, right: 0, top: 120, alignItems: 'center' },
   emptyText: { fontSize: 15, fontWeight: '700', color: MUTED },
 
   tile: {
     position: 'absolute',
-    width: TILE_W,
-    height: TILE_H,
     borderWidth: LINE,
     borderColor: INK,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    padding: 10,
     justifyContent: 'space-between',
+    overflow: 'hidden',
   },
+  tileCompact: { padding: 7 },
   tileModule: { backgroundColor: YELLOW },
   tileApp: { backgroundColor: WHITE },
   tileTask: { backgroundColor: INK },
-  tileDetached: { opacity: 0.55, borderStyle: 'dashed' },
-  tileLifted: {
-    borderWidth: 3,
-    elevation: 8,
+  tilePressed: { opacity: 0.8 },
+  tileEditing: { opacity: 0.75 },
+  tileSelected: { borderWidth: 4, borderColor: DANGER },
+  tileDragging: {
+    zIndex: 10,
+    elevation: 10,
     shadowColor: INK,
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 4, height: 4 },
   },
-  tileConnectSource: { borderColor: DANGER, borderWidth: 3 },
-  tileConnectTarget: { borderStyle: 'dashed' },
-  tileHeader: { flexDirection: 'row', alignItems: 'center' },
-  orderBadge: {
-    minWidth: 20,
-    height: 20,
-    paddingHorizontal: 4,
-    backgroundColor: INK,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 6,
-    borderWidth: 1,
-    borderColor: YELLOW,
+  tileTop: { flexDirection: 'row', alignItems: 'flex-start' },
+  num: { fontSize: 30, lineHeight: 32, fontWeight: '900', color: INK, letterSpacing: -1, marginRight: 8 },
+  numSmall: { fontSize: 20, lineHeight: 22 },
+  tileCategory: { flex: 1, textAlign: 'right', fontSize: 9, fontWeight: '900', color: INK, letterSpacing: 0.5, marginTop: 3 },
+  tileTitle: { fontSize: 18, fontWeight: '900', color: INK, letterSpacing: -0.3 },
+  tileTitleSmall: { fontSize: 12, letterSpacing: 0 },
+  tileTitleLarge: { fontSize: 26, letterSpacing: -0.8 },
+  tileDesc: { fontSize: 12, fontWeight: '600', color: INK, opacity: 0.75, marginTop: 1 },
+  tileMeta: { fontSize: 12, fontWeight: '800', color: INK, opacity: 0.75, marginTop: 2 },
+  tileMetaSmall: { fontSize: 10, marginTop: 1 },
+  selMark: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    backgroundColor: DANGER,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
-  orderBadgeEmpty: { backgroundColor: MUTED },
-  orderText: { color: YELLOW, fontSize: 12, fontWeight: '900' },
-  tileCategory: { flex: 1, fontSize: 9, fontWeight: '900', color: INK, letterSpacing: 0.5 },
-  tileTitle: { fontSize: 16, fontWeight: '900', color: INK },
-  tileMeta: { fontSize: 11, fontWeight: '700', color: INK, opacity: 0.7 },
+  selMarkText: { color: WHITE, fontSize: 13, fontWeight: '900' },
   onInk: { color: '#BDBDB6' },
   onInkStrong: { color: YELLOW },
 

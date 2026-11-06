@@ -7,8 +7,8 @@ import { AlarmDraft } from '../alarm/types';
 import { DEFAULT_CHALLENGE, describeChallenge, normalizeChallenge } from '../challenges/challenges';
 import { ALL_DAYS, daysLabel } from '../alarm/time';
 import { RoutineTile } from './types';
+import TimerSettings, { TimerValue } from './TimerSettings';
 
-const DURATIONS = [0, 5, 10, 15, 30, 60];
 
 interface Props {
   tile: RoutineTile | null;
@@ -23,13 +23,13 @@ interface Props {
 export default function AlarmTileEditor({ tile, onSave, onClose }: Props) {
   const { alarms, addAlarm, updateAlarm } = useAlarms();
   const linked = tile?.alarmId ? alarms.find(a => a.id === tile.alarmId) : undefined;
-  const [duration, setDuration] = useState(0);
+  const [timer, setTimer] = useState<TimerValue>({ autoNext: false });
   const [openedFor, setOpenedFor] = useState<string | null>(null);
 
   // Reset czasu trwania przy otwarciu edytora dla innego kafelka.
   if (tile && openedFor !== tile.id) {
     setOpenedFor(tile.id);
-    setDuration(tile.durationMin ?? 0);
+    setTimer({ minutes: tile.durationMin, autoNext: tile.timerAutoNext ?? false });
   }
   if (!tile && openedFor !== null) setOpenedFor(null);
 
@@ -54,14 +54,14 @@ export default function AlarmTileEditor({ tile, onSave, onClose }: Props) {
     let alarmId = linked?.id;
     if (alarmId) await updateAlarm(alarmId, d);
     else alarmId = await addAlarm(d);
-    onSave({ ...tile, alarmId, time: d.time, title: d.label, durationMin: duration || undefined });
+    onSave({ ...tile, alarmId, time: d.time, title: d.label, ...timerFields(timer) });
   };
 
   const linkExisting = (id: string) => {
     if (!tile) return;
     const a = alarms.find(x => x.id === id);
     if (!a) return;
-    onSave({ ...tile, alarmId: a.id, time: a.time, title: a.label, durationMin: duration || undefined });
+    onSave({ ...tile, alarmId: a.id, time: a.time, title: a.label, ...timerFields(timer) });
   };
 
   const others = alarms.filter(a => a.id !== linked?.id).sort((a, b) => a.time.localeCompare(b.time));
@@ -100,23 +100,11 @@ export default function AlarmTileEditor({ tile, onSave, onClose }: Props) {
   const footer = (
     <View style={s.box}>
       <View style={s.bar}>
-        <Text style={s.barText}>Czas na ten krok planu</Text>
+        <Text style={s.barText}>Minutnik w tym kroku planu</Text>
       </View>
-      <View style={s.segmented}>
-        {DURATIONS.map((d, i) => {
-          const active = d === duration;
-          return (
-            <TouchableOpacity
-              key={d}
-              style={[s.segment, i > 0 && s.segmentDivided, active && s.segmentActive]}
-              onPress={() => setDuration(d)}
-            >
-              <Text style={[s.segmentText, active && s.segmentTextActive]}>{d === 0 ? '—' : `${d}`}</Text>
-            </TouchableOpacity>
-          );
-        })}
+      <View style={s.timerBox}>
+        <TimerSettings value={timer} onChange={setTimer} />
       </View>
-      <Text style={s.hint}>W minutach — od tego zależą godziny kolejnych kroków.</Text>
     </View>
   );
 
@@ -132,7 +120,13 @@ export default function AlarmTileEditor({ tile, onSave, onClose }: Props) {
   );
 }
 
+const timerFields = (t: TimerValue) => ({
+  durationMin: t.minutes,
+  timerAutoNext: t.minutes !== undefined && t.autoNext ? true : undefined,
+});
+
 const s = StyleSheet.create({
+  timerBox: { padding: 12 },
   box: { marginHorizontal: 16, marginTop: 16, borderWidth: LINE, borderColor: INK, backgroundColor: WHITE },
   bar: { backgroundColor: INK, paddingHorizontal: 14, paddingVertical: 10 },
   barText: { color: YELLOW, fontSize: 15, fontWeight: '800' },

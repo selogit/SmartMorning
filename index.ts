@@ -1,3 +1,5 @@
+// Musi być pierwszy: zapamiętuje style tworzone przez ekrany (zmiana koloru akcentu).
+import './src/themeRuntime';
 import notifee from '@notifee/react-native';
 import 'expo-router/entry';
 
