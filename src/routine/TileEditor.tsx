@@ -23,6 +23,10 @@ import AlarmTileEditor from './AlarmTileEditor';
 import { useMusic } from '../music/MusicProvider';
 import { serviceLabel } from '../music/services';
 import MusicSettings from '../music/MusicSettings';
+import TransitManager from '../transit/TransitManager';
+import TimerSettings, { TimerValue } from './TimerSettings';
+import ChecklistSettings from './ChecklistSettings';
+import { DEFAULT_CHECKLIST } from './checklist';
 
 const NOTE_MODES: { mode: NoteMode; title: string; hint: string }[] = [
   { mode: 'today', title: 'Notatki na dziś', hint: 'Notatki ustawione na dziś i notatka dnia' },
@@ -30,7 +34,6 @@ const NOTE_MODES: { mode: NoteMode; title: string; hint: string }[] = [
   { mode: 'new', title: 'Nowa notatka', hint: 'Ten krok od razu otworzy pustą notatkę' },
 ];
 
-const DURATIONS = [0, 5, 10, 15, 30, 60];
 
 interface Props {
   tile: RoutineTile | null;
@@ -54,7 +57,10 @@ function EditorBody({ tile, onSave, onClose }: { tile: RoutineTile } & Omit<Prop
   const [title, setTitle] = useState(tile.title);
   const [hh, setHh] = useState(tile.time?.split(':')[0] ?? '');
   const [mm, setMm] = useState(tile.time?.split(':')[1] ?? '');
-  const [duration, setDuration] = useState(tile.durationMin ?? 0);
+  const [timer, setTimer] = useState<TimerValue>({ minutes: tile.durationMin, autoNext: tile.timerAutoNext ?? false });
+  const [checklist, setChecklist] = useState<string[]>(tile.checklist ?? DEFAULT_CHECKLIST);
+  const isChecklist = tile.kind === 'checklist';
+  const [weatherHints, setWeatherHints] = useState(tile.weatherHints !== false);
   const [url, setUrl] = useState(tile.url ?? '');
   const [noteMode, setNoteMode] = useState<NoteMode>(tile.noteMode ?? 'today');
   const [noteId, setNoteId] = useState<string | undefined>(tile.noteId);
@@ -75,7 +81,10 @@ function EditorBody({ tile, onSave, onClose }: { tile: RoutineTile } & Omit<Prop
     ...tile,
     title: title.trim() || info.label,
     time: hasTime ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` : undefined,
-    durationMin: duration || undefined,
+    durationMin: timer.minutes,
+    timerAutoNext: timer.minutes !== undefined && timer.autoNext ? true : undefined,
+    checklist: isChecklist ? checklist.map(i => i.trim()).filter(Boolean) : undefined,
+    weatherHints: isChecklist && !weatherHints ? false : undefined,
     url: info.customUrl ? url.trim() || undefined : tile.url,
     noteMode: isNotes ? noteMode : undefined,
     noteId: isNotes && noteMode === 'pick' ? noteId : undefined,
@@ -172,22 +181,20 @@ function EditorBody({ tile, onSave, onClose }: { tile: RoutineTile } & Omit<Prop
             : 'Podaj godzinę 00–23 i minuty 00–59.'}
         </Text>
 
-        <Text style={s.label}>Czas trwania</Text>
-        <View style={s.segmented}>
-          {DURATIONS.map((d, i) => {
-            const active = d === duration;
-            return (
-              <TouchableOpacity
-                key={d}
-                style={[s.segment, i > 0 && s.segmentDivided, active && s.segmentActive]}
-                onPress={() => setDuration(d)}
-              >
-                <Text style={[s.segmentText, active && s.segmentTextActive]}>{d === 0 ? '—' : `${d}`}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        <Text style={s.hint}>W minutach. Podczas planu zobaczysz odliczanie.</Text>
+        {isChecklist && (
+          <>
+            <Text style={s.label}>Rzeczy do zabrania</Text>
+            <ChecklistSettings
+              items={checklist}
+              onChange={setChecklist}
+              weatherHints={weatherHints}
+              onWeatherHints={setWeatherHints}
+            />
+          </>
+        )}
+
+        <Text style={s.label}>Minutnik</Text>
+        <TimerSettings value={timer} onChange={setTimer} />
 
         {info.customUrl && (
           <>
@@ -209,6 +216,14 @@ function EditorBody({ tile, onSave, onClose }: { tile: RoutineTile } & Omit<Prop
           </>
         )}
         {!info.customUrl && info.url && <Text style={s.hint}>Otwiera: {info.url}</Text>}
+
+        {tile.kind === 'transit' && (
+          <>
+            <Text style={s.label}>Połączenia i klucze</Text>
+            <TransitManager />
+            <Text style={s.hint}>W tym kroku planu zobaczysz status wszystkich zapisanych połączeń, odświeżany co 2 minuty.</Text>
+          </>
+        )}
 
         {isMusic && (
           <>

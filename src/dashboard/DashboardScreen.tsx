@@ -1,3 +1,4 @@
+import { useTheme } from '../themeRuntime';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar, SafeAreaView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +30,8 @@ const greetingFor = (h: number) =>
   h < 5 ? 'Dobranoc' : h < 12 ? 'Dzień dobry' : h < 18 ? 'Miłego dnia' : 'Dobry wieczór';
 
 export default function DashboardScreen() {
+  // key={accent}: po zmianie koloru w Ustawieniach pulpit rysuje się od nowa.
+  const { accent } = useTheme();
   const bottomInset = useSafeAreaInsets().bottom;
   const { alarms } = useAlarms();
   const [now, setNow] = useState(() => new Date());
@@ -60,7 +63,7 @@ export default function DashboardScreen() {
   const challengeText = next ? describeChallenge(next.alarm.challenge) : null;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} key={accent}>
       <StatusBar barStyle="dark-content" />
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 32 + bottomInset }]}>
@@ -76,6 +79,16 @@ export default function DashboardScreen() {
               {WEEKDAYS[now.getDay()]}, {now.getDate()} {MONTHS[now.getMonth()]}
             </Text>
           </View>
+          <TouchableOpacity
+            style={styles.settingsCell}
+            onPress={() => router.push('/settings')}
+            activeOpacity={0.7}
+            accessibilityLabel="Ustawienia"
+          >
+            <View style={styles.gearBar} />
+            <View style={styles.gearBar} />
+            <View style={styles.gearBar} />
+          </TouchableOpacity>
         </View>
 
         <EveningCard
@@ -212,7 +225,7 @@ export default function DashboardScreen() {
                     <Text style={styles.planTitle} numberOfLines={1}>
                       {t.title}
                     </Text>
-                    {t.durationMin ? <Text style={styles.planMeta}>{t.durationMin} min</Text> : null}
+                    {t.durationMin ? <Text style={styles.planMeta}>⏱ {t.durationMin} min</Text> : null}
                   </View>
                 </View>
               );
@@ -262,6 +275,15 @@ const styles = StyleSheet.create({
   },
   clock: { fontSize: 52, fontWeight: '900', color: INK, letterSpacing: -2, fontVariant: tabular },
   greetingCell: { flex: 1, paddingHorizontal: 14, justifyContent: 'center' },
+  settingsCell: {
+    width: 48,
+    borderLeftWidth: LINE,
+    borderLeftColor: INK,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 5,
+  },
+  gearBar: { width: 20, height: 3, backgroundColor: INK },
   greeting: { fontSize: 22, fontWeight: '900', color: INK },
   date: { fontSize: 14, fontWeight: '600', color: MUTED, marginTop: 2 },
 

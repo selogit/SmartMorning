@@ -27,7 +27,7 @@ export function useRoutine() {
   return ctx;
 }
 
-const PLACEHOLDER: Routine = { id: 'loading', name: 'Plan dnia', days: [], tiles: [], links: [], startAfterAlarm: true };
+const PLACEHOLDER: Routine = { id: 'loading', name: 'Plan dnia', days: [], tiles: [], startAfterAlarm: true };
 
 export function RoutineProvider({ children }: { children: React.ReactNode }) {
   const [plans, setPlans] = useState<Routine[]>([]);
