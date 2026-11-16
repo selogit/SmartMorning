@@ -13,17 +13,16 @@ export interface RoutineTile {
   id: string;
   kind: TileKind;
   title: string;
-  /** Rozmiar na planszy (brak = średni). Kolejność kroków = kolejność kafelków w planie. */
+  /** Brak = średni. */
   size?: TileSize;
-  /** Planowana godzina rozpoczęcia „HH:MM” (opcjonalna). */
+  /** „HH:MM”. */
   time?: string;
   /** Minutnik kroku w minutach (opcjonalny) — wyznacza też godziny kolejnych kroków. */
   durationMin?: number;
-  /** Po końcu minutnika przejdź sam do następnego kroku. */
   timerAutoNext?: boolean;
-  /** Tylko Przed wyjściem — rzeczy do odhaczenia. */
+  /** Tylko Przed wyjściem. */
   checklist?: string[];
-  /** Tylko Przed wyjściem — dopisuj rzeczy wg prognozy (parasol, czapka). Brak = włączone. */
+  /** Tylko Przed wyjściem; brak = włączone. */
   weatherHints?: boolean;
   /** Link dla kafelków aplikacji (nadpisuje domyślny). */
   url?: string;
@@ -31,7 +30,7 @@ export interface RoutineTile {
   noteMode?: NoteMode;
   /** Tylko Notatnik w trybie 'pick'. */
   noteId?: string;
-  /** Tylko Budzik — alarm, którym steruje kafelek (godzina i nazwa kafelka są z nim synchronizowane). */
+  /** Tylko Budzik — połączony alarm (godzina i nazwa są synchronizowane). */
   alarmId?: string;
   /** Tylko Muzyka — zapisana playlista (brak = domyślna ★). */
   musicId?: string;
@@ -41,11 +40,9 @@ export interface RoutineTile {
 
 export interface Routine {
   id: string;
-  /** Np. „Dni robocze”, „Weekend”. */
   name: string;
-  /** Dni tygodnia, w które obowiązuje plan (0 = nd … 6 = sb). Dzień należy do co najwyżej jednego planu. */
+  /** 0 = nd … 6 = sb; dzień należy do co najwyżej jednego planu. */
   days: number[];
-  /** Kafelki w kolejności wykonania. */
   tiles: RoutineTile[];
   /** Po wyłączeniu budzika plan startuje sam (jeśli zaczyna się od budzika). */
   startAfterAlarm: boolean;

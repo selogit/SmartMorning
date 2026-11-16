@@ -7,7 +7,6 @@ import { timeAgo } from './rss';
 interface Props {
   count?: number;
   tone?: 'light' | 'dark';
-  /** Akcja „Wszystkie wiadomości”. */
   onMore?: () => void;
 }
 

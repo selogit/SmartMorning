@@ -3,7 +3,6 @@ import { Routine, RoutineTile } from './types';
 /** Kolejność wykonania = kolejność kafelków w planie (numery na planszy). */
 export const orderedChain = (r: Routine): RoutineTile[] => r.tiles;
 
-/** Przenosi kafelek z pozycji `from` na pozycję `to`. */
 export function moveTile<T>(list: T[], from: number, to: number): T[] {
   if (from === to || from < 0 || from >= list.length) return list;
   const next = [...list];

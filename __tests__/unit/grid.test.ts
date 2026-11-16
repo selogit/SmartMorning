@@ -1,7 +1,4 @@
-/**
- * Testy jednostkowe: src/routine/grid.ts
- * Układanie kafelków na siatce 4 kolumn (styl Windows 8).
- */
+/** Testy jednostkowe: src/routine/grid.ts */
 import { layoutGrid, cellAt, SPAN, GRID_COLS } from '../../src/routine/grid';
 import { TileSize } from '../../src/routine/types';
 

@@ -9,9 +9,8 @@ const STALE_MS = 30 * 60 * 1000;
 export const MAX_KEYWORDS = 5;
 
 export interface NewsSettings {
-  /** Tematy w przeglądzie „Dla mnie”. */
   digestTopics: TopicId[];
-  /** Własne hasła (wyszukiwanie z ostatnich 2 dni), też w przeglądzie. */
+  /** Własne hasła (wyniki z ostatnich 2 dni). */
   keywords: string[];
 }
 

@@ -12,12 +12,9 @@ export interface BedtimeSettings {
 export const DEFAULT_BEDTIME: BedtimeSettings = { enabled: true, sleepMinutes: 8 * 60, remindBefore: 30 };
 
 export interface Night {
-  /** Pierwszy alarm danego dnia. */
   wake: Date;
   alarm: Alarm;
-  /** Kiedy położyć się spać. */
   bedtime: Date;
-  /** Kiedy wysłać przypomnienie. */
   remindAt: Date;
 }
 

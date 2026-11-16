@@ -88,22 +88,17 @@ function Wheel({ count, value, onChange, onTouchStart, divided }: WheelProps) {
 }
 
 export interface AlarmEditorProps {
-  /** Dane początkowe; null = edytor zamknięty. */
+  /** null = edytor zamknięty. */
   draft: AlarmDraft | null;
   title: string;
   onSave: (draft: AlarmDraft) => void | Promise<void>;
   onClose: () => void;
-  /** Przycisk „Usuń alarm” na dole (tylko przy edycji istniejącego alarmu). */
   onDelete?: () => void;
-  /** Dodatkowa treść nad polami alarmu (np. wybór istniejącego alarmu dla kafelka). */
   header?: React.ReactNode;
-  /** Dodatkowa treść pod zadaniami (np. czas trwania kroku w planie). */
   footer?: React.ReactNode;
 }
 
-/**
- * Jeden edytor alarmu dla całej aplikacji: ekran Budzik i kafelek Budzik na planszy planu dnia.
- */
+/** Wspólny edytor alarmu: ekran Budzik i kafelek Budzik w planie. */
 export default function AlarmEditor(props: AlarmEditorProps) {
   const { draft, onClose } = props;
   return (

@@ -1,7 +1,4 @@
-/**
- * Testy jednostkowe: src/notes/markdown.ts
- * Parser i edytor minimalnego Markdownu notatek.
- */
+/** Testy jednostkowe: src/notes/markdown.ts */
 import {
   parseLine,
   parseInline,

@@ -9,7 +9,6 @@ interface Props {
   /** light = strona główna (jasne tło), dark = plan dnia / ekran pobudki. */
   tone?: 'light' | 'dark';
   onPress?: () => void;
-  /** Pokaż pasek godzin porannych. */
   showHours?: boolean;
 }
 

@@ -11,7 +11,6 @@ export interface ChecklistState {
 
 export const norm = (s: string) => s.trim().toLowerCase();
 
-/** Stan na dziś — wczorajsze odhaczenia nie przechodzą na kolejny dzień. */
 export function stateForDay(stored: ChecklistState | null, day: string): ChecklistState {
   return stored && stored.date === day ? stored : { date: day, checked: {} };
 }

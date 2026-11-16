@@ -1,7 +1,4 @@
-/**
- * Testy jednostkowe: src/news/rss.ts
- * Parser RSS 2.0 (bez zależności) i dat RFC 822.
- */
+/** Testy jednostkowe: src/news/rss.ts */
 import { decodeEntities, parseRssDate, parseRss } from '../../src/news/rss';
 
 describe('decodeEntities', () => {

@@ -1,7 +1,4 @@
-/**
- * Testy jednostkowe: src/transit/status.ts
- * Dobór kursu z rozkładu i wyliczanie statusu (opóźnienia, odwołania).
- */
+/** Testy jednostkowe: src/transit/status.ts (pociągi) */
 import { pickTrain, trainStatus, carrierLabel } from '../../src/transit/status';
 import { PlannedTrain, TrainLive } from '../../src/transit/plk';
 import { TrainTrip } from '../../src/transit/types';

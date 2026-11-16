@@ -18,13 +18,9 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 /**
- * Tworzy kanał powiadomień, którego dźwięk gra na strumieniu ALARMU (AudioAttributes.USAGE_ALARM),
- * a nie powiadomień — dzięki temu budzik dzwoni także przy wyciszonym telefonie / trybie wibracji,
- * z głośnością ustawioną dla alarmów. Notifee nie pozwala ustawić AudioAttributes kanału,
- * więc kanał tworzymy tutaj; notifee tylko wysyła na niego powiadomienia.
- *
- * Uwaga: Android nie pozwala zmienić dźwięku istniejącego kanału, dlatego przy zmianie
- * ustawień trzeba użyć nowego ID kanału.
+ * Kanał z dźwiękiem na strumieniu alarmu (USAGE_ALARM), więc budzik dzwoni też w trybie cichym.
+ * Notifee nie ustawia AudioAttributes kanału, dlatego tworzymy go tutaj.
+ * Dźwięku istniejącego kanału nie da się zmienić — nowy dźwięk wymaga nowego ID kanału.
  */
 class AlarmChannelModule : Module() {
   companion object {
@@ -112,10 +108,7 @@ class AlarmChannelModule : Module() {
       true
     }
 
-    /**
-     * Odtwarza dźwięk alarmu w pętli na strumieniu ALARMU, z wibracją. Gra niezależnie od powiadomienia —
-     * dotknięcie powiadomienia ani rozwinięcie panelu go nie wycisza. Wyłącza go tylko stopAlarmSound().
-     */
+    /** Dźwięk alarmu w pętli z wibracją, niezależny od powiadomienia; wyłącza go tylko stopAlarmSound(). */
     Function("startAlarmSound") { soundName: String ->
       if (player != null) {
         return@Function true

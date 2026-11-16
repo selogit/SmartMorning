@@ -37,11 +37,10 @@ export interface TileKindInfo {
   category: TileCategory;
   /** Ekran w tej aplikacji (moduł). Brak trasy przy module = „Wkrótce”. */
   route?: Href;
-  /** Domyślny link — linki https otwierają aplikację, jeśli jest zainstalowana (Gmail, Spotify…). */
+  /** Domyślny link (https otwiera aplikację, jeśli jest zainstalowana). */
   url?: string;
   /** Link do aplikacji (np. „slack://open”) próbowany przed `url`; gdy aplikacji nie ma — otwiera się `url`. */
   appUrl?: string;
-  /** Użytkownik podaje własny link. */
   customUrl?: boolean;
   /** Moduł działa w całości w kroku planu (bez osobnego ekranu). */
   inline?: boolean;

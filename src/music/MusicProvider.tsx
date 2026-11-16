@@ -10,10 +10,9 @@ export interface MusicItem {
 }
 
 interface Stored {
-  /** Serwis, z którego zwykle korzystasz. */
   service: ServiceId;
   items: MusicItem[];
-  /** Playlista domyślna na poranek (★). */
+  /** Playlista na poranek (★). */
   defaultId?: string;
 }
 

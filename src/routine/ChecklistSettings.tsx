@@ -10,7 +10,6 @@ interface Props {
   onWeatherHints: (on: boolean) => void;
 }
 
-/** Edycja listy „Przed wyjściem” w opcjach kafelka. */
 export default function ChecklistSettings({ items, onChange, weatherHints, onWeatherHints }: Props) {
   const [draft, setDraft] = useState('');
 

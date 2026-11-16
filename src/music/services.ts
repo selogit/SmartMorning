@@ -33,10 +33,7 @@ export function detectService(url: string): ServiceId {
 
 export const isValidMusicUrl = (url: string) => /^(https?:\/\/\S+|spotify:\S+)$/i.test(url.trim());
 
-/**
- * Link Spotify z przeglądarki → adres aplikacji (spotify:playlist:ID), który otwiera Spotify bez przeglądarki.
- * Pozostałe serwisy otwierają się z linków https (App Links), jeśli aplikacja jest zainstalowana.
- */
+/** Link Spotify → `spotify:…`, żeby otworzyć aplikację zamiast przeglądarki. */
 export function toAppUrl(url: string): string {
   const m = /open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(playlist|album|track|artist|show|episode)\/([A-Za-z0-9]+)/i.exec(url);
   return m ? `spotify:${m[1].toLowerCase()}:${m[2]}` : url;

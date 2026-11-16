@@ -4,10 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ACCENTS, YELLOW, setAccentValue } from './theme';
 
 /**
- * Zmiana koloru akcentu bez przepisywania wszystkich ekranów:
- * StyleSheet.create zwraca zwykłe obiekty, więc zapamiętujemy je (bez zamrażania)
- * i przy zmianie podmieniamy w nich stary kolor na nowy. Ten moduł musi być
- * zaimportowany jako pierwszy (index.ts), zanim powstaną style ekranów.
+ * Zmiana akcentu bez przepisywania ekranów: zapamiętujemy arkusze StyleSheet.create
+ * i podmieniamy w nich kolor. Musi być importowany jako pierwszy (index.ts).
  */
 type Sheet = Record<string, Record<string, unknown>>;
 const sheets: Sheet[] = [];

@@ -1,7 +1,4 @@
-/**
- * Testy jednostkowe: src/routine/chain.ts
- * Kolejność kafelków rutyny i wyliczanie godzin kroków.
- */
+/** Testy jednostkowe: src/routine/chain.ts */
 import { moveTile, removeTile, scheduleTimes } from '../../src/routine/chain';
 import { Routine, RoutineTile } from '../../src/routine/types';
 

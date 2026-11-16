@@ -10,10 +10,7 @@ const TIP_X = 3;
 const HEAD_LEFT = TIP_X - HEAD / 2 + (HEAD * Math.SQRT2) / 2;
 const MID = SIZE / 2;
 
-/**
- * Strzałka „wstecz” rysowana z kształtów (nie znak tekstowy), więc jest zawsze wyśrodkowana —
- * czcionki Androida różnie układają znak „←” w pionie.
- */
+/** Strzałka z kształtów, nie znak „←” — czcionki Androida różnie go wyśrodkowują. */
 export default function BackArrow({ color = INK }: { color?: string }) {
   return (
     <View style={s.box}>

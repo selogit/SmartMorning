@@ -13,7 +13,7 @@ export interface ChallengeConfig {
   phrase: string;
   shakeCount: number;
   stepCount: number;
-  /** Treść zarejestrowanego kodu (QR lub kreskowego), który wyłącza alarm. */
+  /** Kod (QR lub kreskowy), który wyłącza alarm. */
   qrValue?: string;
   /** Gdzie jest kod, np. „Łazienka” — podpowiedź na ekranie pobudki. */
   qrLabel?: string;
@@ -74,10 +74,7 @@ type StoredChallenge = Partial<ChallengeConfig> & { type?: string };
 const isKind = (t: unknown): t is ChallengeKind =>
   typeof t === 'string' && (CHALLENGE_KINDS as string[]).includes(t);
 
-/**
- * Uzupełnia brakujące pola i migruje stary zapis z jednym zadaniem (`type`)
- * do listy `types`. Alarmy sprzed dodania zadań dostają pustą listę.
- */
+/** Uzupełnia braki i migruje stary format (`type` → `types`). */
 export const normalizeChallenge = (c?: StoredChallenge | null): ChallengeConfig => {
   const { type, ...rest } = c ?? {};
   const raw: unknown[] = Array.isArray(rest.types) ? rest.types : type ? [type] : [];

@@ -8,15 +8,14 @@ export const CODE_TYPES = ['qr', 'ean13', 'ean8', 'upc_a', 'upc_e', 'code128', '
 
 interface Props {
   onScanned: (data: string) => void;
-  /** Tekst nad ramką. */
   hint?: string;
-  /** Wywoływane, gdy nie ma zgody na aparat i nie da się o nią zapytać. */
+  /** Brak zgody na aparat. */
   onPermissionDenied?: () => void;
   /** false = aparat działa, ale nie zgłasza kodów (np. po udanym skanie). */
   active?: boolean;
 }
 
-/** Podgląd z aparatu z ramką celownika; zgłasza zeskanowany kod (z ochroną przed wielokrotnym zgłoszeniem). */
+/** Podgląd aparatu z celownikiem; każdy kod zgłasza raz. */
 export default function QrScanner({ onScanned, hint, onPermissionDenied, active = true }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const last = useRef<{ data: string; at: number } | null>(null);

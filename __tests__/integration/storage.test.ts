@@ -1,7 +1,4 @@
-/**
- * Testy INTEGRACYJNE: src/routine/storage.ts + AsyncStorage (mock w pamięci)
- * Zapis/odczyt planów, migracja starych formatów, odporność na uszkodzone dane.
- */
+/** Testy integracyjne: plany dnia + AsyncStorage, migracje formatów, uszkodzone dane. */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadPlans, savePlans, defaultRoutine, emptyRoutine, migrateTiles, planForDate, makeTile } from '../../src/routine/storage';
 

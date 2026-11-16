@@ -1,7 +1,4 @@
-/**
- * Testy jednostkowe: src/routine/checklist.ts
- * Stan checklisty dziennej i podpowiedzi pogodowe.
- */
+/** Testy jednostkowe: src/routine/checklist.ts */
 import { stateForDay, toggleItem, isChecked, weatherItems, ChecklistState } from '../../src/routine/checklist';
 import { Forecast } from '../../src/weather/types';
 

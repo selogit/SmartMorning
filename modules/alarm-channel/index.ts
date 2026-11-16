@@ -12,7 +12,7 @@ interface AlarmChannelNative {
 
 const native = Platform.OS === 'android' ? requireOptionalNativeModule<AlarmChannelNative>('AlarmChannel') : null;
 
-/** Czy moduł natywny jest dostępny (wymaga przebudowania aplikacji po dodaniu modułu). */
+/** Czy moduł natywny jest wbudowany (wymaga nowego buildu). */
 export const isAlarmChannelAvailable = native !== null;
 
 /** Tworzy kanał z dźwiękiem na strumieniu alarmu. Zwraca false, gdy moduł niedostępny. */
@@ -45,10 +45,7 @@ export function createSilentChannel(id: string, name: string): boolean {
   }
 }
 
-/**
- * Odtwarza dźwięk alarmu w pętli (strumień alarmu + wibracja), niezależnie od powiadomienia.
- * Zwraca false, gdy moduł niedostępny albo odtwarzanie się nie udało.
- */
+/** Dźwięk alarmu w pętli (strumień alarmu + wibracja), niezależny od powiadomienia. false = błąd. */
 export function startAlarmSound(soundName: string): boolean {
   if (!native) return false;
   try {

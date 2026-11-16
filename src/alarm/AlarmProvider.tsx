@@ -27,20 +27,18 @@ import {
 
 const STORAGE_KEY = 'alarms';
 const ALARM_SOUND = 'wake_alarm';
-/** Kanał z dźwiękiem na strumieniu ALARMU (moduł natywny modules/alarm-channel). */
+/** Kanał na strumieniu alarmu (modules/alarm-channel). */
 const ALARM_CHANNEL = 'wake_alarm_v3';
-/** Stary kanał notifee (strumień powiadomień — milknie przy wyciszonym telefonie). */
+/** Stary kanał notifee — cichnie w trybie cichym. */
 const LEGACY_CHANNEL = 'wake_alarm_v2';
 const CHANNEL_FLAG_KEY = 'alarmChannel';
-/** Cichy kanał dla powiadomienia trwającego alarmu — dźwięk gra wtedy w aplikacji. */
+/** Cichy kanał, gdy dźwięk gra w aplikacji. */
 const RINGING_CHANNEL = 'wake_alarm_ringing';
 export const SNOOZE_MINUTES = 5;
 
 interface AlarmContextValue {
   alarms: Alarm[];
-  /** Czy alarmy zostały już wczytane z pamięci. */
   loaded: boolean;
-  /** Zwraca id nowego alarmu. */
   addAlarm: (draft: AlarmDraft) => Promise<string>;
   updateAlarm: (id: string, draft: AlarmDraft) => Promise<void>;
   deleteAlarm: (id: string) => Promise<void>;
@@ -55,10 +53,7 @@ export function useAlarms() {
   return ctx;
 }
 
-/**
- * Kanał alarmu: najpierw natywny (dźwięk jako alarm), a jeśli moduł nie jest wbudowany
- * w aplikację (stary build) — dotychczasowy kanał notifee.
- */
+/** Kanał natywny; w starym buildzie bez modułu — kanał notifee. */
 async function ensureAlarmChannel(): Promise<string> {
   if (createAlarmChannel(ALARM_CHANNEL, 'Budzik', ALARM_SOUND)) return ALARM_CHANNEL;
   return notifee.createChannel({
@@ -121,10 +116,7 @@ async function scheduleAt(timestamp: number, label: string, alarmId: string) {
 const scheduleNotification = (time: string, label: string, alarmId: string, days?: number[]) =>
   scheduleAt(nextAlarmDate(time, days).getTime(), label, alarmId);
 
-/**
- * Trzyma stan alarmów i ekran pobudki na poziomie całej aplikacji,
- * więc alarm przejmuje ekran niezależnie od otwartego modułu.
- */
+/** Stan alarmów i ekran pobudki dla całej aplikacji. */
 export function AlarmProvider({ children }: { children: React.ReactNode }) {
   const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [activeAlarm, setActiveAlarm] = useState<Alarm | null>(null);
@@ -171,10 +163,7 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  /**
-   * Jednorazowo przenosi włączone alarmy na nowy kanał (dźwięk jako alarm) i usuwa stary kanał.
-   * Pomijane, gdy moduł natywny nie jest wbudowany albo alarm właśnie dzwoni.
-   */
+  /** Jednorazowo przenosi włączone alarmy na kanał natywny. */
   const migrateChannel = async () => {
     if (!isAlarmChannelAvailable) return;
     if ((await AsyncStorage.getItem(CHANNEL_FLAG_KEY)) === ALARM_CHANNEL) return;
@@ -187,10 +176,7 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(CHANNEL_FLAG_KEY, ALARM_CHANNEL);
   };
 
-  /**
-   * Każdy włączony alarm musi mieć zaplanowane powiadomienie. Naprawia alarmy, które już raz zadzwoniły
-   * (wcześniej planowane jednorazowo) i takie, których system nie dostarczył.
-   */
+  /** Każdy włączony alarm musi mieć zaplanowane powiadomienie (także po zadzwonieniu). */
   const ensureScheduled = async () => {
     const pending = new Set(await notifee.getTriggerNotificationIds());
     const displayed = new Set(
@@ -290,11 +276,7 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
     await saveAlarms(alarmsRef.current.map(a => (a.id === id ? { ...a, enabled } : a)));
   };
 
-  /**
-   * Gdy pojawia się ekran pobudki, dźwięk przejmuje aplikacja (pętla na strumieniu alarmu),
-   * a powiadomienie przechodzi na cichy kanał. Dźwięku powiadomienia Android nie gwarantuje —
-   * milknie po dotknięciu powiadomienia lub rozwinięciu panelu; dźwięk aplikacji gra do końca zadań.
-   */
+  /** Na ekranie pobudki dźwięk gra w aplikacji do końca zadań — dźwięk powiadomienia Android wycisza po dotknięciu. */
   useEffect(() => {
     if (!activeAlarm) return;
     const ringing = activeAlarm;
@@ -331,7 +313,6 @@ export function AlarmProvider({ children }: { children: React.ReactNode }) {
         await scheduleNotification(alarm.time, alarm.label, alarm.id, alarm.days);
       }
     }
-    // Plan dnia zaczynający się od budzika rusza dalej sam.
     try {
       // Plan, który zaczyna się od kafelka tego alarmu; jeśli brak — plan na dziś.
       const plans = await loadPlans();

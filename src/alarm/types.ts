@@ -5,7 +5,7 @@ export interface Alarm {
   time: string;
   enabled: boolean;
   label: string;
-  /** Zadania wymagane przed wyłączeniem alarmu (brak = stare alarmy, bez zadań). */
+  /** Brak = stary alarm bez zadań. */
   challenge?: ChallengeConfig;
   /** Dni tygodnia (0 = nd … 6 = sb). Brak = codziennie, [] = jednorazowo. */
   days?: number[];

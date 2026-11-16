@@ -1,7 +1,4 @@
-/**
- * Testy INTEGRACYJNE: src/weather/api.ts (fetch zamockowany) → advice.ts → checklist.ts
- * Pełny przepływ: odpowiedź Open-Meteo → Forecast → porady i podpowiedzi checklisty.
- */
+/** Testy integracyjne: Open-Meteo (fetch zamockowany) → porady → checklista. */
 import { fetchForecast, searchPlaces } from '../../src/weather/api';
 import { adviceFor, morningWindow } from '../../src/weather/advice';
 import { weatherItems } from '../../src/routine/checklist';

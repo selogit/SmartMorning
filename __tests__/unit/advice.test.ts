@@ -1,7 +1,4 @@
-/**
- * Testy jednostkowe: src/weather/advice.ts
- * Okno poranka i podpowiedzi pogodowe.
- */
+/** Testy jednostkowe: src/weather/advice.ts */
 import { morningWindow, adviceFor, weatherLine } from '../../src/weather/advice';
 import { Forecast, HourPoint } from '../../src/weather/types';
 

@@ -22,10 +22,7 @@ export function useBedtime() {
   return ctx;
 }
 
-/**
- * Przypomnienia o pójściu spać: liczone od pierwszego alarmu każdego dnia,
- * planowane od razu na 7 najbliższych nocy (działają bez otwierania aplikacji).
- */
+/** Przypomnienia o śnie na 7 nocy naprzód — działają bez otwierania aplikacji. */
 export function BedtimeProvider({ children }: { children: React.ReactNode }) {
   const { alarms, loaded: alarmsLoaded } = useAlarms();
   const [settings, setSettingsState] = useState<BedtimeSettings>(DEFAULT_BEDTIME);

@@ -1,7 +1,4 @@
-/**
- * Testy jednostkowe: src/sleep/bedtime.ts
- * Wyliczanie pory snu na podstawie pierwszego alarmu dnia.
- */
+/** Testy jednostkowe: src/sleep/bedtime.ts */
 import { upcomingWakeTimes, upcomingNights, currentNight, sleepLabel, hm, DEFAULT_BEDTIME } from '../../src/sleep/bedtime';
 import { Alarm } from '../../src/alarm/types';
 
@@ -33,11 +30,8 @@ describe('upcomingWakeTimes', () => {
   it('respektuje dni tygodnia: alarm Pn–Pt nie dzwoni w weekend', () => {
     const alarms = [alarm('praca', '06:30', { days: [1, 2, 3, 4, 5] })];
     const wakes = upcomingWakeTimes(alarms, wedEvening, 4);
-    // ZNALEZIONY DEFEKT (dokumentujemy zachowanie zastane): żądano 4 pobudek,
-    // ale pętla skanuje tylko count+2 dni (śr–pon), więc po przeskoczeniu
-    // weekendu zwraca 3 zamiast 4. Wtorek wypada poza horyzont skanowania.
-    // Oczekiwane docelowo: [4, 5, 1, 2]. Poprawka: skanować dni aż do
-    // zebrania `count` wyników (z bezpiecznym limitem, np. count+7).
+    // Defekt D1: skanowane jest tylko count+2 dni, więc po weekendzie wychodzą 3 pobudki zamiast 4.
+    // Docelowo [4, 5, 1, 2] — skanować aż do zebrania `count` wyników.
     expect(wakes.map(w => w.wake.getDay())).toEqual([4, 5, 1]);
     for (const w of wakes) expect([0, 6]).not.toContain(w.wake.getDay()); // nigdy weekend
   });

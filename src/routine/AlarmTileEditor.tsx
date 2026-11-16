@@ -16,10 +16,7 @@ interface Props {
   onClose: () => void;
 }
 
-/**
- * Kafelek Budzik edytuje prawdziwy alarm — tym samym edytorem co ekran Budzik.
- * Kafelek bez połączonego alarmu tworzy nowy alarm przy zapisie (albo łączy się z istniejącym).
- */
+/** Kafelek Budzik edytuje prawdziwy alarm; bez połączonego alarmu tworzy nowy. */
 export default function AlarmTileEditor({ tile, onSave, onClose }: Props) {
   const { alarms, addAlarm, updateAlarm } = useAlarms();
   const linked = tile?.alarmId ? alarms.find(a => a.id === tile.alarmId) : undefined;

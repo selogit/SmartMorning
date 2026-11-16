@@ -1,10 +1,4 @@
-/**
- * Testy FUNKCJONALNE — scenariusz S1: „Poranek w dzień roboczy"
- *
- * Aktor: użytkownik z alarmem 06:30 (Pn–Pt), planem porannym i checklistą.
- * Przebieg przez realne moduły aplikacji: alarm → plan dnia → harmonogram
- * kroków → checklista z podpowiedzią pogodową → przypomnienie o śnie.
- */
+/** Test funkcjonalny S1: poranek w dzień roboczy (sen → alarm → plan → checklista). */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { nextAlarmDate, daysLabel, WORK_DAYS } from '../../src/alarm/time';
 import { savePlans, loadPlans, planForDate, makeTile } from '../../src/routine/storage';
@@ -18,7 +12,6 @@ import { Routine } from '../../src/routine/types';
 const storage = AsyncStorage as any;
 beforeEach(() => storage.__reset());
 
-/** Dane testowe: wtorek 2026-11-10, wieczór. */
 const mondayEvening = new Date(2026, 10, 9, 21, 30); // poniedziałek 21:30
 const alarm: Alarm = { id: 'praca', time: '06:30', enabled: true, label: 'Praca', days: WORK_DAYS };
 

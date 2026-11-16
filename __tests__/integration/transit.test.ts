@@ -1,7 +1,4 @@
-/**
- * Testy INTEGRACYJNE: src/transit/plk.ts (parsowanie) → status.ts (statusy kursów)
- * Przepływ: surowa odpowiedź Portalu Pasażera → utrudnienia → status z alertami.
- */
+/** Testy integracyjne: utrudnienia PKP PLK → status kursu. */
 import { parseDisruptions } from '../../src/transit/plk';
 import { pickTrain, trainStatus } from '../../src/transit/status';
 import { PlannedTrain } from '../../src/transit/plk';

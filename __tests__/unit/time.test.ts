@@ -1,7 +1,4 @@
-/**
- * Testy jednostkowe: src/alarm/time.ts
- * Logika wyliczania najbliższego terminu alarmu i etykiet dni tygodnia.
- */
+/** Testy jednostkowe: src/alarm/time.ts */
 import {
   pad,
   parseTime,

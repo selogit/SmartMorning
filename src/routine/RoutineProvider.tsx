@@ -8,7 +8,6 @@ type Update = Routine | ((prev: Routine) => Routine);
 interface RoutineContextValue {
   plans: Routine[];
   loaded: boolean;
-  /** Plan obowiązujący dziś (wg dni tygodnia). */
   todayPlan: Routine;
   updatePlan: (id: string, update: Update) => void;
   /** Zmiana stosowana do wszystkich planów (np. synchronizacja kafelków Budzik). */

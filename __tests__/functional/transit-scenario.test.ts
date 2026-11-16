@@ -1,11 +1,4 @@
-/**
- * Testy FUNKCJONALNE — scenariusz S3: „Czy zdążę na pociąg?"
- *
- * Aktor: użytkownik z zapisanym dojazdem 07:30. Aplikacja dobiera kurs
- * z rozkazu jazdy, nakłada dane na żywo i pokazuje status na pulpicie.
- * Zestaw danych: rozkład + trzy warianty danych na żywo (punktualny,
- * opóźniony, odwołany) + utrudnienia.
- */
+/** Test funkcjonalny S3: „Czy zdążę na pociąg?” — punktualny, opóźniony, odwołany, brak kursu. */
 import { pickTrain, trainStatus } from '../../src/transit/status';
 import { parseDisruptions, PlannedTrain } from '../../src/transit/plk';
 import { TrainTrip } from '../../src/transit/types';

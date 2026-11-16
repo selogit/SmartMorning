@@ -1,13 +1,6 @@
 /**
- * Testy WYDAJNOŚCIOWE (pkt 5 sylabusa)
- *
- * Kryteria: funkcje wywoływane przy każdym renderze/odświeżeniu ekranu muszą
- * zmieścić się w budżecie pojedynczej klatki UI (16 ms) z dużym zapasem,
- * nawet przy danych znacznie większych niż realne. Benchmark mierzy medianę
- * z wielu przebiegów (po rozgrzewce JIT), więc wynik jest stabilny.
- *
- * Uwaga: środowisko testowe (serwer x86) jest szybsze od telefonu — budżety
- * przyjęto ostro (×10 zapasu względem klatki), by wynik przenosił się na sprzęt.
+ * Testy wydajnościowe: mediana z 30 przebiegów po rozgrzewce.
+ * Budżet: klatka 16 ms; dla funkcji wywoływanych przy renderze ×10 zapasu (1,6 ms).
  */
 import { layoutGrid } from '../../src/routine/grid';
 import { parseRss } from '../../src/news/rss';

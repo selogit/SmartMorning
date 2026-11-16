@@ -40,7 +40,6 @@ export interface TransitSettings {
 
 export type StatusTone = 'ok' | 'late' | 'bad' | 'unknown';
 
-/** Wynik sprawdzenia jednego połączenia. */
 export interface TripStatus {
   tripId: string;
   /** Główna informacja, np. „+6 min” albo „planowo”. */
@@ -48,9 +47,7 @@ export interface TripStatus {
   tone: StatusTone;
   /** Szczegóły w jednej linii, np. „KM 19123 · peron 3 · odjazd 07:48”. */
   detail: string;
-  /** Kolejne odjazdy / dodatkowe linie. */
   extra?: string[];
-  /** Komunikaty o utrudnieniach dotyczące połączenia. */
   alerts?: string[];
   checkedAt: number;
   error?: string;

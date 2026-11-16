@@ -1,11 +1,4 @@
-/**
- * Testy jednostkowe: ztmStatus / pickDepartures (src/transit/status.ts)
- *
- * Test regresyjny defektu D2 znalezionego podczas testów ręcznych (16.11.2026):
- * kurs 520 o 09:22 sprawdzany o 21:37 pokazywał „≈ +743 min”. Szacunek z GPS
- * był liczony dla kursu, który już odjechał — pojazd tej samej brygady jechał
- * wtedy zupełnie innym kursem, a „opóźnienie” = 8 min dojazdu − (−735 min).
- */
+/** Test regresyjny D2: kurs sprawdzany po odjeździe pokazywał „≈ +743 min”. */
 import { ztmStatus } from '../../src/transit/status';
 import { ZtmDeparture, ZtmVehicle } from '../../src/transit/ztm';
 import { ZtmTrip } from '../../src/transit/types';

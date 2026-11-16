@@ -1,9 +1,4 @@
-/**
- * Testy FUNKCJONALNE — scenariusz S2: „Notatka dnia i edycja planu w Markdownie"
- *
- * Aktor: użytkownik otwiera notatkę dnia z kafelka rutyny, dopisuje zadania
- * paskiem narzędzi edytora i odhacza je w podglądzie.
- */
+/** Test funkcjonalny S2: notatka dnia i edycja Markdownu. */
 import { openTodayNote } from '../../src/notes/today';
 import { Note } from '../../src/notes/NotesProvider';
 import { toggleLinePrefix, continueList, toggleCheckAt, parseLine, toggleInline } from '../../src/notes/markdown';

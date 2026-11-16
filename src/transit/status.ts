@@ -110,10 +110,7 @@ export function distanceKm(aLat: number, aLon: number, bLat: number, bLon: numbe
 
 const stripZeros = (s: string) => s.replace(/^0+(?=\d)/, '');
 
-/**
- * Szacunek z GPS: pojazd tej samej linii i brygady co odjazd → odległość od przystanku
- * i czas dojazdu przy średniej prędkości miejskiej. To przybliżenie, nie oficjalne opóźnienie.
- */
+/** Szacunek z GPS (pojazd tej samej brygady, ~17 km/h) — przybliżenie, ZTM nie podaje opóźnień. */
 export function gpsEstimate(dep: ZtmDeparture, vehicles: ZtmVehicle[], trip: ZtmTrip, now = new Date()) {
   if (trip.lat === undefined || trip.lon === undefined || !dep.brigade) return null;
   const v = vehicles.find(x => stripZeros(x.brigade) === stripZeros(dep.brigade));
@@ -140,8 +137,7 @@ export function ztmStatus(
   const cur = nowMin(now);
   const lines = picked.map(({ d, m }) => {
     const inMin = m - cur;
-    // GPS tylko dla kursu, który jeszcze nie odjechał: po odjeździe pojazd tej samej
-    // brygady jedzie już innym kursem i „opóźnienie” wychodzi absurdalne (defekt D2).
+    // Po odjeździe ta brygada jedzie już innym kursem — GPS nie dotyczy tego odjazdu.
     const upcoming = inMin >= -2 && inMin <= 90;
     const est = vehicles && upcoming ? gpsEstimate(d, vehicles, trip, now) : null;
     const when = `${d.time.slice(0, 5)}${inMin >= 0 && inMin <= 90 ? ` (za ${inMin} min)` : ''}`;

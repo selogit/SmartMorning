@@ -21,7 +21,7 @@ const HOW_TO: Record<string, string> = {
   soundcloud: 'W SoundCloud: playlista → Udostępnij → Kopiuj link.',
 };
 
-/** Ustawienia muzyki: serwis, zapisane playlisty, ★ na poranek. Używane w ekranie Muzyka i w opcjach kafelka. */
+/** Ustawienia muzyki — ekran Muzyka i opcje kafelka. */
 export default function MusicSettings() {
   const { service, items, defaultId, setService, addItem, removeItem, setDefault } = useMusic();
   const [name, setName] = useState('');
