@@ -100,10 +100,6 @@ npm run test:coverage     # raport pokrycia kodu
 
 Testy obejmują warstwę logiki, a sieć i magazyn danych zastępują atrapami w pamięci, więc działają w zwykłym Node, bez urządzenia.
 
-## Kontekst
-
-Projekt zaliczeniowy z przedmiotu *Dynamiczna analiza oprogramowania* na SGGW. Zestaw testów powstał w ramach analizy dynamicznej wymaganej na zajęciach.
-
 ## Dane i licencje
 
 Pogoda: [Open-Meteo](https://open-meteo.com/) (CC BY 4.0) · Kolej: Otwarte Dane Kolejowe PKP PLK · Komunikacja miejska: otwarte dane m.st. Warszawy (CC BY) · Wiadomości: Google News RSS.
