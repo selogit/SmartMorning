@@ -140,7 +140,10 @@ export function ztmStatus(
   const cur = nowMin(now);
   const lines = picked.map(({ d, m }) => {
     const inMin = m - cur;
-    const est = vehicles ? gpsEstimate(d, vehicles, trip, now) : null;
+    // GPS tylko dla kursu, który jeszcze nie odjechał: po odjeździe pojazd tej samej
+    // brygady jedzie już innym kursem i „opóźnienie” wychodzi absurdalne (defekt D2).
+    const upcoming = inMin >= -2 && inMin <= 90;
+    const est = vehicles && upcoming ? gpsEstimate(d, vehicles, trip, now) : null;
     const when = `${d.time.slice(0, 5)}${inMin >= 0 && inMin <= 90 ? ` (za ${inMin} min)` : ''}`;
     const gps = est ? ` · GPS: ${est.km.toFixed(1).replace('.', ',')} km, ≈${est.etaMin} min` : '';
     return { d, inMin, est, text: `${when} → ${d.direction}${gps}` };

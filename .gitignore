@@ -2,6 +2,7 @@
 
 # dependencies
 node_modules/
+coverage/
 
 # Expo
 .expo/
@@ -32,6 +33,8 @@ yarn-error.*
 
 # local env files
 .env*.local
+smartmorning-testy.tgz
+sm-src.tgz
 
 # typescript
 *.tsbuildinfo
